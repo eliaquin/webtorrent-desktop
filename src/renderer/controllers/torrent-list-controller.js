@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
-const { ipcRenderer, clipboard } = require('electron')
+const { ipcRenderer } = require('electron')
+const { clipboard } = require('@electron/remote')
 const remote = require('@electron/remote')
 
 const { dispatch } = require('../lib/dispatcher')

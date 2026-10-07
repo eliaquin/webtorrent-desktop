@@ -1,0 +1,8 @@
+{
+  "name": "@webtorrent-desktop/ip-compat",
+  "version": "1.0.0",
+  "description": "Strict IP parsing for the legacy tracker, blocklist and SSDP APIs",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": { "ipaddr.js": "2.5.0" }
+}

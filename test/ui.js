@@ -55,7 +55,7 @@ async function runUI (projectRoot) {
   const { Button, Checkbox, TextField, ProgressBar } = require(projectRoot + '/build/renderer/components/ui')
   const App = require(projectRoot + '/build/renderer/pages/app')
   const dispatcher = require(projectRoot + '/build/renderer/lib/dispatcher')
-  const { clipboard } = require('electron')
+  const { clipboard } = require(projectRoot + '/node_modules/@electron/remote')
   const root = createRoot(document.querySelector('#body'))
   const h = React.createElement
   const act = React.act

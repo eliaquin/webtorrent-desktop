@@ -8,6 +8,7 @@ const { app, ipcMain } = require('electron')
 const log = require('./log')
 const menu = require('./menu')
 const windows = require('./windows')
+const config = require('../config')
 
 // Messages from the main process, to be sent once the WebTorrent process starts
 const messageQueueMainToWebTorrent = []
@@ -220,10 +221,16 @@ function init () {
 
   const oldEmit = ipcMain.emit
   ipcMain.emit = (name, e, ...args) => {
+    if (e && e.sender) {
+      const allowed = [windows.main.win, windows.webtorrent.win, windows.about.win].filter(Boolean)
+      const frame = e.senderFrame
+      if (!allowed.some(win => win.webContents === e.sender) || !frame || frame.parent ||
+          ![config.WINDOW_MAIN, config.WINDOW_WEBTORRENT, config.WINDOW_ABOUT].map(url => new URL(url).href).includes(frame.url)) return false
+    }
     // Relay messages between the main window and the WebTorrent hidden window
     if (name.startsWith('wt-') && !app.isQuitting) {
       console.dir(e.sender.getTitle())
-      if (e.sender.getTitle() === 'WebTorrent Hidden Window') {
+      if (windows.webtorrent.win && e.sender === windows.webtorrent.win.webContents) {
         // Send message to main window
         windows.main.send(name, ...args)
         log('webtorrent: got %s', name)

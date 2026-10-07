@@ -34,13 +34,13 @@ async function extractEmbeddedSubtitles (filePath) {
   const ffprobe = findTool('ffprobe')
   const ffmpeg = findTool('ffmpeg')
   const options = { encoding: 'utf8', timeout: 60000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
-  const { stdout } = await run(ffprobe, ['-v', 'error', '-select_streams', 's', '-show_entries', 'stream=index,codec_name:stream_tags=language,title:stream_disposition=default,forced', '-of', 'json', filePath], options)
+  const { stdout } = await run(ffprobe, ['-v', 'error', '-protocol_whitelist', 'file,pipe', '-select_streams', 's', '-show_entries', 'stream=index,codec_name:stream_tags=language,title:stream_disposition=default,forced', '-of', 'json', filePath], options)
   const streams = JSON.parse(stdout).streams || []
   const tracks = []
   // Extract sequentially to avoid launching one process per language at once.
   for (const stream of streams) {
     if (!textCodecs.has(stream.codec_name)) continue
-    const result = await run(ffmpeg, ['-nostdin', '-v', 'error', '-i', filePath, '-map', `0:${stream.index}`, '-c:s', 'webvtt', '-f', 'webvtt', 'pipe:1'], options)
+    const result = await run(ffmpeg, ['-nostdin', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-i', filePath, '-map', `0:${stream.index}`, '-c:s', 'webvtt', '-f', 'webvtt', 'pipe:1'], options)
     if (!result.stdout.startsWith('WEBVTT')) continue
     const language = languageName(stream.tags && stream.tags.language)
     const title = stream.tags && stream.tags.title

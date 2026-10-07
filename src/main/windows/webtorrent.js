@@ -1,3 +1,5 @@
+const path = require('path')
+const secureWindow = require('../window-security')
 const webtorrent = module.exports = {
   init,
   send,
@@ -25,14 +27,16 @@ function init () {
     title: 'webtorrent-hidden-window',
     useContentSize: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       enableBlinkFeatures: 'AudioVideoTracks',
-      enableRemoteModule: true,
+      sandbox: false,
+      preload: path.join(__dirname, '../../renderer/preload-webtorrent.js'),
       backgroundThrottling: false
     },
     width: 150
   })
+  secureWindow(win)
   require('@electron/remote/main').enable(win.webContents)
 
   win.loadURL(config.WINDOW_WEBTORRENT)

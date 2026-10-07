@@ -1,0 +1,5 @@
+const { spawn } = require('child_process')
+const child = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['start'], { stdio: 'inherit' })
+process.on('SIGTERM', () => child.kill('SIGTERM'))
+process.on('SIGINT', () => child.kill('SIGINT'))
+child.on('exit', code => { process.exitCode = code })

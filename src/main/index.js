@@ -29,7 +29,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 const hidden = argv.includes('--hidden') ||
   (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAsHidden)
 
-if (config.IS_PRODUCTION) {
+if (config.IS_PRODUCTION && !config.IS_TEST) {
   // When Electron is running in production mode (packaged app), then run React
   // in production mode too.
   process.env.NODE_ENV = 'production'
@@ -143,9 +143,9 @@ function delayedInit (state) {
   const FolderWatcher = require('./folder-watcher')
   const folderWatcher = new FolderWatcher({ window: windows.main, state })
 
-  announcement.init()
+  if (!config.IS_TEST) announcement.init()
   dock.init()
-  updater.init()
+  if (!config.IS_TEST) updater.init()
 
   ipc.setModule('folderWatcher', folderWatcher)
   if (folderWatcher.isEnabled()) {

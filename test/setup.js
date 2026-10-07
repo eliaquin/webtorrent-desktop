@@ -1,4 +1,4 @@
-const Application = require('spectron').Application
+const Application = require('./electron-application')
 const { copyFileSync } = require('fs')
 const fs = require('fs')
 const parseTorrent = require('parse-torrent')

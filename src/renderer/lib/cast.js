@@ -14,6 +14,7 @@ module.exports = {
 }
 
 const http = require('http')
+const secureMediaServer = require('./secure-media-server')
 
 const config = require('../../config')
 const { CastingError } = require('./errors')
@@ -147,9 +148,10 @@ function chromecastPlayer () {
         res.end(Buffer.from(selectedSubtitle.buffer.slice(21), 'base64'))
       }).listen(0, () => {
         const port = ret.subServer.address().port
-        const subtitlesUrl = 'http://' + state.server.networkAddress + ':' + port + '/'
+        const subtitlesUrl = 'http://' + state.server.networkAddress + ':' + port + prefix + '/'
         callback(subtitlesUrl)
       })
+      const prefix = secureMediaServer(ret.subServer, state.server.networkAddress)
     }
   }
 

@@ -1,3 +1,5 @@
+const path = require('path')
+const secureWindow = require('../window-security')
 const main = module.exports = {
   dispatch,
   hide,
@@ -41,15 +43,17 @@ function init (state, options) {
     useContentSize: true, // Specify web page size without OS chrome
     width: initialBounds.width,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       enableBlinkFeatures: 'AudioVideoTracks',
-      enableRemoteModule: true,
+      sandbox: false,
+      preload: path.join(__dirname, '../../renderer/preload-main.js'),
       backgroundThrottling: false
     },
     x: initialBounds.x,
     y: initialBounds.y
   })
+  secureWindow(win)
   require('@electron/remote/main').enable(win.webContents)
 
   win.loadURL(config.WINDOW_MAIN)

@@ -1,5 +1,8 @@
 name: ci
 on: [push,pull_request]
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
@@ -10,12 +13,17 @@ jobs:
         os:
           - ubuntu-latest
         node:
-          - '16'
+          - '24'
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
+      - run: npm ci
       - run: npm run build --if-present
       - run: npm test
+      - run: npm run audit
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+      - run: xvfb-run -a npm run test-security
+      - run: xvfb-run -a npm run test-ui
+      - run: xvfb-run -a npm run test-subtitles

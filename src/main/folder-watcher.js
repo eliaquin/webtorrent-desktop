@@ -1,5 +1,6 @@
 const chokidar = require('chokidar')
 const log = require('./log')
+const path = require('path')
 
 class FolderWatcher {
   constructor ({ window, state }) {
@@ -22,14 +23,14 @@ class FolderWatcher {
     this.torrentsFolderPath = torrentsFolderPath
     if (!torrentsFolderPath) return
 
-    const glob = `${torrentsFolderPath}/**/*.torrent`
-    log('Folder Watcher: watching: ', glob)
+    log('Folder Watcher: watching: ', torrentsFolderPath)
 
     const options = {
+      ignored: (filePath, stats) => stats && stats.isFile() && path.extname(filePath).toLowerCase() !== '.torrent',
       ignoreInitial: true,
       awaitWriteFinish: true
     }
-    this.watcher = chokidar.watch(glob, options)
+    this.watcher = chokidar.watch(torrentsFolderPath, options)
     this.watcher
       .on('add', (path) => {
         log('Folder Watcher: added torrent: ', path)

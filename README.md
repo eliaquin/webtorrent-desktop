@@ -52,6 +52,8 @@ Download the latest version of WebTorrent Desktop from
 
 ### Get the code
 
+Use Node.js 24 LTS (or Node.js 22.12+). Node.js 16 and 18 are no longer supported.
+
 ```
 $ git clone https://github.com/webtorrent/webtorrent-desktop.git
 $ cd webtorrent-desktop
@@ -78,6 +80,32 @@ $ npm run watch
 $ npm test
 ```
 
+### Security checks
+
+```
+$ npm run audit
+$ npm run test-security
+$ npm run test-subtitles
+```
+
+Subtitle tests require FFmpeg. Linux CI runs Electron tests under Xvfb.
+
+The dependency audit was reduced from 67 affected packages (including five
+critical) to zero known advisories on October 7, 2026. This includes development
+and optional dependencies. npm advisories do not cover every possible bug or
+external tools such as the system FFmpeg installation.
+
+The application now runs Node APIs in isolated preloads, blocks page scripts,
+navigation and popups, validates IPC senders, and protects media/caption servers
+with random access tokens and Host/Origin checks. Preloads still require
+`sandbox: false`; migrating their filesystem/network work to utility processes
+would further reduce the impact of a future Chromium or preload compromise.
+
+Legacy network packages use `vendor/ip-compat`, a small replacement for their IP
+APIs built on `ipaddr.js`, rather than the unpatched `ip` dependency. Explicit
+XML, protobuf, Browserslist and temporary-file overrides keep transitive packages
+on patched versions; security regression tests cover the required legacy APIs.
+
 ### Run integration tests
 
 Run the React UI interaction checks in Electron, without WebDriver:
@@ -95,7 +123,7 @@ Run the existing screenshot integration suite:
 $ npm run test-integration
 ```
 
-The integration tests use Spectron and Tape. They click through the app, taking screenshots and
+The integration tests use Playwright and Tape. They click through the app, taking screenshots and
 comparing each one to a reference. Why screenshots?
 
 * Ad-hoc checking makes the tests a lot more work to write
@@ -164,6 +192,10 @@ $ brew install wine mono
 (Requires the [Homebrew](http://brew.sh/) package manager.)
 
 #### Mac build notes
+
+Signed builds require `APPLE_SIGNING_IDENTITY` and an `APPLE_NOTARY_PROFILE`
+created with `xcrun notarytool store-credentials`. Unsigned local builds do not
+require Apple credentials.
 
 The Mac app can only be packaged from **macOS**.
 

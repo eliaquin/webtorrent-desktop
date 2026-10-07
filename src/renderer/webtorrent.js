@@ -6,7 +6,6 @@ const crypto = require('crypto')
 const util = require('util')
 const { ipcRenderer } = require('electron')
 const fs = require('fs')
-const mm = require('music-metadata')
 const networkAddress = require('network-address')
 const path = require('path')
 const WebTorrent = require('webtorrent')
@@ -14,6 +13,7 @@ const WebTorrent = require('webtorrent')
 const config = require('../config')
 const { TorrentKeyNotFoundError } = require('./lib/errors')
 const torrentPoster = require('./lib/torrent-poster')
+const secureMediaServer = require('./lib/secure-media-server')
 
 /**
  * WebTorrent version.
@@ -303,19 +303,21 @@ function startServerFromReadyTorrent (torrent) {
 
   // start the streaming torrent-to-http server
   server = torrent.createServer()
+  const address = networkAddress()
   server.listen(0, () => {
     const port = server.address().port
-    const urlSuffix = ':' + port
+    const urlSuffix = ':' + port + prefix
     const info = {
       torrentKey: torrent.key,
       localURL: 'http://localhost' + urlSuffix,
-      networkURL: 'http://' + networkAddress() + urlSuffix,
-      networkAddress: networkAddress()
+      networkURL: 'http://' + address + urlSuffix,
+      networkAddress: address
     }
 
     ipcRenderer.send('wt-server-running', info)
     ipcRenderer.send('wt-server-' + torrent.infoHash, info)
   })
+  const prefix = secureMediaServer(server, address)
 }
 
 function stopServer () {
@@ -326,7 +328,8 @@ function stopServer () {
 
 console.log('Initializing...')
 
-function getAudioMetadata (infoHash, index) {
+async function getAudioMetadata (infoHash, index) {
+  const mm = await import('music-metadata')
   const torrent = client.get(infoHash)
   const file = torrent.files[index]
 
@@ -349,7 +352,7 @@ function getAudioMetadata (infoHash, index) {
     // If completed; use direct file access
     ? mm.parseFile(path.join(torrent.path, file.path), options)
     // otherwise stream
-    : mm.parseStream(file.createReadStream(), file.name, options)
+    : mm.parseStream(file.createReadStream(), { path: file.name, size: file.length }, options)
 
   onMetadata
     .then(

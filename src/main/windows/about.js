@@ -1,3 +1,5 @@
+const path = require('path')
+const secureWindow = require('../window-security')
 const about = module.exports = {
   init,
   win: null
@@ -25,14 +27,16 @@ function init () {
     title: 'About ' + config.APP_WINDOW_TITLE,
     useContentSize: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       enableBlinkFeatures: 'AudioVideoTracks',
-      enableRemoteModule: true,
+      sandbox: false,
+      preload: path.join(__dirname, '../../renderer/preload-about.js'),
       backgroundThrottling: false
     },
     width: 300
   })
+  secureWindow(win)
   require('@electron/remote/main').enable(win.webContents)
 
   win.loadURL(config.WINDOW_ABOUT)

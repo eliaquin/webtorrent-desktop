@@ -132,7 +132,7 @@ function torrentPosterFromVideo (torrent, cb) {
   const index = torrent.files.indexOf(file)
 
   const server = torrent.createServer(0)
-  server.listen(0, onListening)
+  server.listen(0, '127.0.0.1', onListening)
 
   function onListening () {
     const port = server.address().port

@@ -5,7 +5,7 @@
  */
 
 const cp = require('child_process')
-const electronPackager = require('electron-packager')
+const { packager: electronPackager } = require('@electron/packager')
 const fs = require('fs')
 const minimist = require('minimist')
 const os = require('os')
@@ -31,7 +31,7 @@ const argv = minimist(process.argv.slice(2), {
     sign: false
   },
   string: [
-    'package'
+    'package', 'arch'
   ]
 })
 
@@ -40,8 +40,8 @@ function build () {
   rimraf.sync(NODE_MODULES_PATH)
   cp.execSync('npm ci', { stdio: 'inherit' })
 
-  console.log('Nuking dist/ and build/...')
-  rimraf.sync(DIST_PATH)
+  console.log('Preparing dist/ and rebuilding source...')
+  fs.mkdirSync(DIST_PATH, { recursive: true })
   rimraf.sync(BUILD_PATH)
 
   console.log('Build: Transpiling to ES5...')
@@ -117,8 +117,8 @@ const darwin = {
   // Build for Mac
   platform: 'darwin',
 
-  // Build x64 binary only.
-  arch: 'x64',
+  // Build for the current Mac architecture, or the explicit --arch override.
+  arch: argv.arch || process.arch,
 
   // The bundle identifier to use in the application's plist (Mac only).
   appBundleId: 'io.webtorrent.webtorrent',
@@ -248,7 +248,7 @@ function buildDarwin (cb) {
     fs.writeFileSync(infoPlistPath, plist.build(infoPlist))
 
     // Copy torrent file icon into app bundle
-    cp.execSync(`cp ${config.APP_FILE_ICON + '.icns'} ${resourcesPath}`)
+    fs.copyFileSync(config.APP_FILE_ICON + '.icns', path.join(resourcesPath, path.basename(config.APP_FILE_ICON) + '.icns'))
 
     if (process.platform === 'darwin') {
       if (argv.sign) {
@@ -265,8 +265,8 @@ function buildDarwin (cb) {
     }
 
     function signApp (cb) {
-      const sign = require('electron-osx-sign')
-      const { notarize } = require('electron-notarize')
+      const sign = require('@electron/osx-sign')
+      const { notarize } = require('@electron/notarize')
 
       /*
        * Sign the app with Apple Developer ID certificates. We sign the app for 2 reasons:
@@ -282,26 +282,24 @@ function buildDarwin (cb) {
        *   - Membership in the Apple Developer Program
        */
       const signOpts = {
-        verbose: true,
         app: appPath,
         platform: 'darwin',
-        identity: 'Developer ID Application: WebTorrent, LLC (5MAMC8G3L8)',
-        hardenedRuntime: true,
-        entitlements: path.join(config.ROOT_PATH, 'bin', 'darwin-entitlements.plist'),
-        'entitlements-inherit': path.join(config.ROOT_PATH, 'bin', 'darwin-entitlements.plist'),
-        'signature-flags': 'library'
+        identity: process.env.APPLE_SIGNING_IDENTITY,
+        optionsForFile: () => ({
+          hardenedRuntime: true,
+          entitlements: path.join(config.ROOT_PATH, 'bin', 'darwin-entitlements.plist')
+        })
       }
-
       const notarizeOpts = {
-        appBundleId: darwin.appBundleId,
         appPath,
-        appleId: 'feross@feross.org',
-        appleIdPassword: '@keychain:AC_PASSWORD'
+        keychainProfile: process.env.APPLE_NOTARY_PROFILE
+      }
+      if (!signOpts.identity || !notarizeOpts.keychainProfile) {
+        return cb(new Error('--sign requires APPLE_SIGNING_IDENTITY and APPLE_NOTARY_PROFILE'))
       }
 
       console.log('Mac: Signing app...')
-      sign(signOpts, function (err) {
-        if (err) return cb(err)
+      sign.sign(signOpts).then(function () {
         console.log('Mac: Signed app.')
 
         console.log('Mac: Notarizing app...')
@@ -313,7 +311,7 @@ function buildDarwin (cb) {
           function (err) {
             cb(err)
           })
-      })
+      }).catch(cb)
     }
 
     function pack (cb) {
@@ -321,7 +319,7 @@ function buildDarwin (cb) {
 
       if (argv.package === 'dmg' || argv.package === 'all') {
         packageDmg(cb)
-      }
+      } else cb(null)
     }
 
     function packageZip () {
@@ -338,42 +336,18 @@ function buildDarwin (cb) {
     function packageDmg (cb) {
       console.log('Mac: Creating dmg...')
 
-      const appDmg = require('appdmg')
-
       const targetPath = path.join(DIST_PATH, BUILD_NAME + '.dmg')
-      rimraf.sync(targetPath)
-
-      // Create a .dmg (Mac disk image) file, for easy user installation.
-      const dmgOpts = {
-        basepath: config.ROOT_PATH,
-        target: targetPath,
-        specification: {
-          title: config.APP_NAME,
-          icon: config.APP_ICON + '.icns',
-          background: path.join(config.STATIC_PATH, 'appdmg.png'),
-          'icon-size': 128,
-          contents: [
-            { x: 122, y: 240, type: 'file', path: appPath },
-            { x: 380, y: 240, type: 'link', path: '/Applications' },
-            // Hide hidden icons out of view, for users who have hidden files shown.
-            // https://github.com/LinusU/node-appdmg/issues/45#issuecomment-153924954
-            { x: 50, y: 500, type: 'position', path: '.background' },
-            { x: 100, y: 500, type: 'position', path: '.DS_Store' },
-            { x: 150, y: 500, type: 'position', path: '.Trashes' },
-            { x: 200, y: 500, type: 'position', path: '.VolumeIcon.icns' }
-          ]
-        }
-      }
-
-      const dmg = appDmg(dmgOpts)
-      dmg.once('error', cb)
-      dmg.on('progress', function (info) {
-        if (info.type === 'step-begin') console.log(info.title + '...')
-      })
-      dmg.once('finish', function (info) {
-        console.log('Mac: Created dmg.')
+      const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-dmg-'))
+      try {
+        cp.execFileSync('ditto', [appPath, path.join(staging, config.APP_NAME + '.app')])
+        fs.symlinkSync('/Applications', path.join(staging, 'Applications'))
+        cp.execFileSync('hdiutil', ['create', '-volname', config.APP_NAME, '-srcfolder', staging, '-ov', '-format', 'UDZO', targetPath], { stdio: 'inherit' })
         cb(null)
-      })
+      } catch (err) {
+        cb(err)
+      } finally {
+        fs.rmSync(staging, { recursive: true, force: true })
+      }
     }
   }).catch(function (err) {
     cb(err)

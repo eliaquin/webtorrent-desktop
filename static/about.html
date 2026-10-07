@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; font-src 'self'; media-src 'self' file: data: blob: http://localhost:* http://127.0.0.1:*; connect-src http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       body {
@@ -30,10 +31,10 @@
     <img src="../static/WebTorrent.png">
     <h1>WebTorrent</h1>
     <p>
-      Version <script>document.write(require('../package.json').version)</script>
-      (<script>document.write(require('webtorrent/package.json').version)</script>)
-      (<script>document.write(process.arch)</script>)
+      Version <span id="app-version"></span>
+      (<span id="torrent-version"></span>)
+      (<span id="app-arch"></span>)
     </p>
-    <p><script>document.write(require('../build/config').APP_COPYRIGHT)</script></p>
+    <p><span id="app-copyright"></span></p>
   </body>
 </html>
