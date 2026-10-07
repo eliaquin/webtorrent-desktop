@@ -22,6 +22,7 @@ module.exports = class SubtitlesController {
 
   selectSubtitle (ix) {
     this.state.playing.subtitles.selectedIndex = ix
+    this.state.playing.subtitles.userSelected = true
   }
 
   toggleSubtitlesMenu () {
@@ -62,6 +63,7 @@ module.exports = class SubtitlesController {
   }
 
   checkForSubtitles () {
+    this.checkForEmbeddedSubtitles()
     if (this.state.playing.type !== 'video') return
     const torrentSummary = this.state.getPlayingTorrentSummary()
     if (!torrentSummary || !torrentSummary.progress) return
@@ -73,6 +75,40 @@ module.exports = class SubtitlesController {
       const filePath = path.join(torrentSummary.path, file.path)
       this.addSubtitles([filePath], false)
     })
+  }
+
+  checkForEmbeddedSubtitles () {
+    const state = this.state
+    if (state.playing.type !== 'video' || state.playing.location !== 'local') return
+    const subtitles = state.playing.subtitles
+    if (subtitles.loadingEmbedded || subtitles.checkedEmbedded) return
+    const torrent = state.getPlayingTorrentSummary()
+    const file = state.getPlayingFileSummary()
+    if (!torrent || !file || !torrent.path) return
+    const progress = torrent.progress && torrent.progress.files && torrent.progress.files[state.playing.fileIndex]
+    // Reading an incomplete, preallocated MKV can yield corrupt subtitle packets.
+    if (progress ? progress.numPiecesPresent !== progress.numPieces : torrent.status !== 'seeding') return
+    const filePath = path.join(torrent.path, file.path)
+    subtitles.loadingEmbedded = true
+    const { extractEmbeddedSubtitles } = require('../lib/embedded-subtitles')
+    extractEmbeddedSubtitles(filePath).then(tracks => {
+      if (state.playing.subtitles !== subtitles) return // another file is now playing
+      subtitles.checkedEmbedded = true
+      subtitles.tracks.push(...tracks)
+      const saved = file.selectedSubtitle
+      let selected = tracks.findIndex(track => saved && typeof saved === 'object' && saved.filePath === track.filePath && saved.streamIndex === track.streamIndex)
+      if (selected < 0) selected = tracks.findIndex(track => !track.forced && isSystemLanguage(track.language))
+      if (selected < 0) selected = tracks.findIndex(track => track.default)
+      if (selected < 0 && tracks.length) selected = 0
+      if (selected >= 0 && subtitles.selectedIndex === -1 && !subtitles.userSelected) {
+        subtitles.selectedIndex = subtitles.tracks.length - tracks.length + selected
+      }
+      relabelSubtitles(subtitles)
+    }).catch(err => {
+      if (state.playing.subtitles !== subtitles) return
+      subtitles.checkedEmbedded = true
+      dispatch('error', err)
+    }).finally(() => { subtitles.loadingEmbedded = false })
   }
 
   isSubtitle (file) {
@@ -127,7 +163,8 @@ function isSystemLanguage (language) {
 function relabelSubtitles (subtitles) {
   const counts = {}
   subtitles.tracks.forEach(track => {
-    const lang = track.language
+    const lang = track.embedded ? track.baseLabel || track.label : track.language
+    if (track.embedded) track.baseLabel = lang
     counts[lang] = (counts[lang] || 0) + 1
     track.label = counts[lang] > 1 ? (lang + ' ' + counts[lang]) : lang
   })

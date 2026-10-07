@@ -120,7 +120,8 @@
     "test-integration": "npm run build && node ./test",
     "update-authors": "./bin/update-authors.sh",
     "watch": "nodemon --exec \"npm run start\" --ext js,css --ignore build/ --ignore dist/",
-    "test-ui": "npm run build && electron test/ui.js"
+    "test-ui": "npm run build && electron test/ui.js",
+    "test-subtitles": "npm run build && electron test/subtitles.js"
   },
   "standard": {
     "parser": "@babel/eslint-parser"

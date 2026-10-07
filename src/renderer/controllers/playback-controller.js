@@ -316,7 +316,7 @@ module.exports = class PlaybackController {
     dispatch('checkForSubtitles')
 
     // enable previously selected subtitle track
-    if (fileSummary.selectedSubtitle) {
+    if (typeof fileSummary.selectedSubtitle === 'string') {
       dispatch('addSubtitles', [fileSummary.selectedSubtitle], true)
     }
 

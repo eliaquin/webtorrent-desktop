@@ -188,6 +188,13 @@ UI controls are local React components backed by native HTML controls in
 `src/renderer/components/ui/`, styled in `static/main.css`. No component framework
 or theme provider is required.
 
+Embedded text subtitles (including ASS/SSA in MKV files) are extracted to WebVTT
+when the playing file has finished downloading. This requires `ffmpeg` and
+`ffprobe` on PATH; macOS builds also look in the standard Homebrew locations.
+On macOS, install them with `brew install ffmpeg`. Image subtitles such as PGS
+and VobSub are not supported. WebVTT conversion preserves text and timing, but
+does not reproduce ASS fonts, positioning, or animation.
+
 ### Privacy
 
 WebTorrent Desktop collects some basic usage stats to help us make the app better.
