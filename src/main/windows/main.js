@@ -17,7 +17,7 @@ const main = module.exports = {
 }
 
 const { app, BrowserWindow, screen } = require('electron')
-const debounce = require('debounce')
+const debounce = require('../../shared/debounce')
 
 const config = require('../../config')
 const log = require('../log')
@@ -46,7 +46,7 @@ function init (state, options) {
       nodeIntegration: false,
       contextIsolation: true,
       enableBlinkFeatures: 'AudioVideoTracks',
-      sandbox: false,
+      sandbox: true,
       preload: path.join(__dirname, '../../renderer/preload-main.js'),
       backgroundThrottling: false
     },
@@ -54,7 +54,6 @@ function init (state, options) {
     y: initialBounds.y
   })
   secureWindow(win)
-  require('@electron/remote/main').enable(win.webContents)
 
   win.loadURL(config.WINDOW_MAIN)
 

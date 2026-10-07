@@ -4,7 +4,7 @@ module.exports = {
 }
 
 const config = require('../../config')
-const { InvalidSoundNameError } = require('./errors')
+const { InvalidSoundNameError } = require('../../shared/errors')
 const path = require('path')
 
 const VOLUME = 0.25

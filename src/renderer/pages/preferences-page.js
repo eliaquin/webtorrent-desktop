@@ -1,6 +1,5 @@
 const { Button, TextField, Checkbox } = require('../components/ui')
 const React = require('react')
-const PropTypes = require('prop-types')
 
 const colors = require('../components/ui/colors')
 const Heading = require('../components/heading')
@@ -310,13 +309,8 @@ class PreferencesPage extends React.Component {
   }
 }
 
+/** @extends {React.Component<{title?: string, children?: import('react').ReactNode}>} */
 class PreferencesSection extends React.Component {
-  static get propTypes () {
-    return {
-      title: PropTypes.string
-    }
-  }
-
   render () {
     const style = {
       marginBottom: 25,

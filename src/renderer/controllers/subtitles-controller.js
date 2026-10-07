@@ -1,7 +1,5 @@
-const remote = require('@electron/remote')
-const fs = require('fs')
+const native = require('../lib/native-api')
 const path = require('path')
-const parallel = require('run-parallel')
 
 const { dispatch } = require('../lib/dispatcher')
 
@@ -10,12 +8,8 @@ module.exports = class SubtitlesController {
     this.state = state
   }
 
-  openSubtitles () {
-    const filenames = remote.dialog.showOpenDialogSync({
-      title: 'Select a subtitles file.',
-      filters: [{ name: 'Subtitles', extensions: ['vtt', 'srt'] }],
-      properties: ['openFile']
-    })
+  async openSubtitles () {
+    const filenames = await native.chooseSubtitles()
     if (!Array.isArray(filenames)) return
     this.addSubtitles(filenames, true)
   }
@@ -30,17 +24,15 @@ module.exports = class SubtitlesController {
     subtitles.showMenu = !subtitles.showMenu
   }
 
-  addSubtitles (files, autoSelect) {
+  async addSubtitles (files, autoSelect) {
     // Subtitles are only supported when playing video files
     if (this.state.playing.type !== 'video') return
     if (files.length === 0) return
     const subtitles = this.state.playing.subtitles
 
-    // Read the files concurrently, then add all resulting subtitle tracks
-    const tasks = files.map((file) => (cb) => loadSubtitle(file, cb))
-    parallel(tasks, (err, tracks) => {
-      if (err) return dispatch('error', err)
-
+    try {
+      const tracks = await Promise.all(files.map(file => native.readSubtitle(file.path || file)))
+      if (this.state.playing.subtitles !== subtitles) return
       // No dupes allowed
       tracks.forEach((track, i) => {
         let trackIndex = subtitles.tracks.findIndex((t) =>
@@ -59,7 +51,7 @@ module.exports = class SubtitlesController {
 
       // Finally, make sure no two tracks have the same label
       relabelSubtitles(subtitles)
-    })
+    } catch (err) { dispatch('error', err) }
   }
 
   checkForSubtitles () {
@@ -90,8 +82,7 @@ module.exports = class SubtitlesController {
     if (progress ? progress.numPiecesPresent !== progress.numPieces : torrent.status !== 'seeding') return
     const filePath = path.join(torrent.path, file.path)
     subtitles.loadingEmbedded = true
-    const { extractEmbeddedSubtitles } = require('../lib/embedded-subtitles')
-    extractEmbeddedSubtitles(filePath).then(tracks => {
+    native.extractEmbeddedSubtitles(filePath).then(tracks => {
       if (state.playing.subtitles !== subtitles) return // another file is now playing
       subtitles.checkedEmbedded = true
       subtitles.tracks.push(...tracks)
@@ -116,37 +107,6 @@ module.exports = class SubtitlesController {
     const ext = path.extname(name).toLowerCase()
     return ext === '.srt' || ext === '.vtt'
   }
-}
-
-function loadSubtitle (file, cb) {
-  // Lazy load to keep startup fast
-  const concat = require('simple-concat')
-  const LanguageDetect = require('languagedetect')
-  const srtToVtt = require('srt-to-vtt')
-
-  // Read the .SRT or .VTT file, parse it, add subtitle track
-  const filePath = file.path || file
-
-  const vttStream = fs.createReadStream(filePath).pipe(srtToVtt())
-
-  concat(vttStream, (err, buf) => {
-    if (err) return dispatch('error', 'Can\'t parse subtitles file.')
-
-    // Detect what language the subtitles are in
-    const vttContents = buf.toString().replace(/(.*-->.*)/g, '')
-    let langDetected = (new LanguageDetect()).detect(vttContents, 2)
-    langDetected = langDetected.length ? langDetected[0][0] : 'subtitle'
-    langDetected = langDetected.slice(0, 1).toUpperCase() + langDetected.slice(1)
-
-    const track = {
-      buffer: 'data:text/vtt;base64,' + buf.toString('base64'),
-      language: langDetected,
-      label: langDetected,
-      filePath
-    }
-
-    cb(null, track)
-  })
 }
 
 // Checks whether a language name like 'English' or 'German' matches the system

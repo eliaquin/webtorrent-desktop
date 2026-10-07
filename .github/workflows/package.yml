@@ -19,7 +19,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
     - run: npm ci
-    - run: npm run package -- linux
+    - run: sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm
+    - run: npm run package -- linux --arch x64
+    - run: npm run checksums
     - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: linux
@@ -27,6 +29,7 @@ jobs:
           dist/*.deb
           dist/*.rpm
           dist/*.zip
+          dist/*SHA256SUMS.txt
   package_macos:
     runs-on: macos-latest
     steps:
@@ -41,13 +44,15 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
     - run: npm ci
-    - run: npm run package -- darwin
+    - run: npm run package -- darwin --arch arm64
+    - run: npm run checksums
     - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: macos
         path: |
           dist/*.dmg
           dist/*.zip
+          dist/*SHA256SUMS.txt
   package_windows:
     runs-on: windows-latest
     steps:
@@ -62,7 +67,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
     - run: npm ci
-    - run: npm run package -- win32
+    - run: npm run package -- win32 --arch x64
+    - run: npm run checksums
     - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: windows
@@ -70,3 +76,4 @@ jobs:
           dist/*.exe
           dist/*.nupkg
           dist/*.zip
+          dist/*SHA256SUMS.txt

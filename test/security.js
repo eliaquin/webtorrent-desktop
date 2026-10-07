@@ -6,7 +6,7 @@ const path = require('path')
 const { _electron } = require('playwright')
 const ip = require('../vendor/ip-compat')
 const http = require('http')
-const secureMediaServer = require('../src/renderer/lib/secure-media-server')
+const secureMediaServer = require('../src/engine/secure-media-server')
 
 async function main () {
   for (const address of ['127.0.0.1', '127.1', '0x7f000001', '0177.0.0.1', '::1', '::ffff:127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.169.254', 'invalid']) {
@@ -17,11 +17,17 @@ async function main () {
   assert.strictEqual(ip.toLong('192.168.1.1'), 3232235777)
   assert.strictEqual(ip.toString(Buffer.from([127, 0, 0, 1])), '127.0.0.1')
   assert.strictEqual(ip.cidrSubnet('192.168.1.7/24').broadcastAddress, '192.168.1.255')
-  const IPSet = require('ip-set')
+  const IPSet = require('../vendor/ip-set-compat')
   const set = new IPSet()
   set.add('192.168.1.0/24')
   assert(set.contains('192.168.1.5'))
   assert(!set.contains('192.168.2.5'))
+  set.add('2001:db8::/64')
+  assert(set.contains('2001:db8::1234'))
+  assert(!set.contains('2001:db8:1::1'))
+  set.add({ start: '10.1.0.5', end: '10.1.0.10' })
+  assert(set.contains('10.1.0.7'))
+  assert(!set.contains('10.1.0.11'))
   const plist = require('plist')
   assert.deepStrictEqual(plist.parse(plist.build({ title: 'test', enabled: true })), { title: 'test', enabled: true })
   const xml = require('xml2js')
@@ -53,7 +59,7 @@ async function main () {
     await new Promise(resolve => server.close(resolve))
   }
 
-  const WebTorrent = require('webtorrent')
+  const WebTorrent = (await import('webtorrent')).default
   const client = new WebTorrent({ dht: false, tracker: false, lsd: false, natUpnp: false, natPmp: false })
   let torrentServer
   try {
@@ -63,14 +69,14 @@ async function main () {
       client.once('error', reject)
       client.seed(content, resolve)
     })
-    torrentServer = torrent.createServer()
+    torrentServer = client.createServer()
     const listening = new Promise(resolve => torrentServer.listen(0, '127.0.0.1', resolve))
-    const prefix = secureMediaServer(torrentServer, '127.0.0.1')
+    const prefix = secureMediaServer(torrentServer.server, '127.0.0.1')
     await listening
     const url = 'http://127.0.0.1:' + torrentServer.address().port
     assert.strictEqual((await fetch(url + '/0')).status, 403)
-    assert.strictEqual(await (await fetch(url + prefix + '/0')).text(), content.toString())
-    const range = await fetch(url + prefix + '/0', { headers: { Range: 'bytes=0-6' } })
+    assert.strictEqual(await (await fetch(url + prefix + '/webtorrent/' + torrent.infoHash + '/security.txt')).text(), content.toString())
+    const range = await fetch(url + prefix + '/webtorrent/' + torrent.infoHash + '/security.txt', { headers: { Range: 'bytes=0-6' } })
     assert.strictEqual(range.status, 206)
     assert.strictEqual(await range.text(), 'Offline')
   } finally {
@@ -89,15 +95,30 @@ async function main () {
     let page = application.windows().find(page => page.url().endsWith('/main.html'))
     if (!page) page = await application.waitForEvent('window', { predicate: page => page.url().endsWith('/main.html') })
     await page.waitForSelector('.app')
+    // Exercise the actual utility-process command path, not just Node imports.
+    const seedPath = path.join(directory, 'Downloads', 'utility-test.txt')
+    fs.writeFileSync(seedPath, 'Utility process streaming regression')
+    const stream = await application.evaluate(async (electron, seedPath) => {
+      const fromProject = process.getBuiltinModule('module').createRequire(electron.app.getAppPath() + '/package.json')
+      const service = fromProject(electron.app.getAppPath() + '/build/main/torrent-service')
+      const wait = name => new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Utility event timed out: ' + name)), 15000)
+        service.events.once(name, (...args) => { clearTimeout(timeout); resolve(args) })
+      })
+      const ready = wait('wt-ready')
+      service.send('wt-create-torrent', 987, { files: [{ path: seedPath }], announce: [] })
+      const [, info] = await ready
+      const running = wait('wt-server-running')
+      service.send('wt-start-server', info.infoHash)
+      return (await running)[0]
+    }, seedPath)
+    assert.strictEqual(await (await fetch(stream.localURL + '/utility-test.txt')).text(), 'Utility process streaming regression')
+    assert.strictEqual((await fetch(stream.localURL.replace(/\/[a-f\d]{64}/, '') + '/utility-test.txt')).status, 403)
     assert.deepStrictEqual(await page.evaluate(() => [typeof window.require, typeof window.process, typeof window.dispatch]), ['undefined', 'undefined', 'undefined'])
     await page.evaluate(() => window.open('https://example.com'))
-    assert.strictEqual(application.windows().length, 2, 'popups must not create privileged windows')
+    assert.strictEqual(application.windows().length, 1, 'popups must not create privileged windows')
     const policies = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map(win => win.webContents.getLastWebPreferences()))
-    assert(policies.every(policy => !policy.nodeIntegration && policy.contextIsolation))
-    await application.evaluate(async ({ BrowserWindow }) => {
-      const worker = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/webtorrent.html'))
-      await worker.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: 'client.destroy()' }])
-    })
+    assert(policies.every(policy => !policy.nodeIntegration && policy.contextIsolation && policy.sandbox))
     await page.evaluate(() => { const script = document.createElement('script'); script.textContent = 'window.injected = true'; document.body.appendChild(script) })
     assert.strictEqual(await page.evaluate(() => window.injected), undefined, 'CSP must block injected scripts')
     const title = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/main.html')).getTitle())
@@ -109,9 +130,9 @@ async function main () {
       fake.destroy()
     })
     assert.strictEqual(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/main.html')).getTitle()), title, 'a forged window cannot send privileged IPC')
-    await application.evaluate(async ({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/main.html'))
-      await win.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: 'dispatch("preferences")' }])
+    await application.evaluate(electron => {
+      const fromProject = process.getBuiltinModule('module').createRequire(electron.app.getAppPath() + '/package.json')
+      fromProject(electron.app.getAppPath() + '/build/main/windows').main.dispatch('preferences')
     })
     await page.waitForSelector('[aria-label="Global trackers"]')
     await application.evaluate(electron => {
@@ -120,7 +141,7 @@ async function main () {
       fromProject(root + '/build/main/windows').about.init()
     })
     const about = application.windows().find(page => page.url().endsWith('/about.html')) || await application.waitForEvent('window', { predicate: page => page.url().endsWith('/about.html') })
-    await about.waitForFunction(() => document.querySelector('#app-version').textContent === '0.24.0')
+    await about.waitForFunction(version => document.querySelector('#app-version').textContent === version, require('../package.json').version)
     assert.strictEqual(await about.evaluate(() => typeof window.require), 'undefined')
     const beforeNavigation = page.url()
     await page.evaluate(() => { window.location.href = 'https://example.com' })

@@ -10,8 +10,7 @@ const fs = require('fs')
 const minimist = require('minimist')
 const os = require('os')
 const path = require('path')
-const rimraf = require('rimraf')
-const series = require('run-series')
+const removeDirectory = target => require('fs').rmSync(target, { recursive: true, force: true })
 const zip = require('cross-zip')
 
 const config = require('../src/config')
@@ -37,16 +36,16 @@ const argv = minimist(process.argv.slice(2), {
 
 function build () {
   console.log('Installing node_modules...')
-  rimraf.sync(NODE_MODULES_PATH)
+  removeDirectory(NODE_MODULES_PATH)
   cp.execSync('npm ci', { stdio: 'inherit' })
 
   console.log('Preparing dist/ and rebuilding source...')
   fs.mkdirSync(DIST_PATH, { recursive: true })
-  rimraf.sync(BUILD_PATH)
+  removeDirectory(BUILD_PATH)
 
-  console.log('Build: Transpiling to ES5...')
+  console.log('Build: Compiling Node modules, browser UI and sandboxed preloads...')
   cp.execSync('npm run build', { NODE_ENV: 'production', stdio: 'inherit' })
-  console.log('Build: Transpiled to ES5.')
+  console.log('Build: Compiled application.')
 
   const platform = argv._[0]
   if (platform === 'darwin') {
@@ -139,7 +138,7 @@ const win32 = {
   platform: 'win32',
 
   // Build x64 binary only.
-  arch: 'x64',
+  arch: argv.arch || process.arch,
 
   // Object hash of application metadata to embed into the executable (Windows only)
   win32metadata: {
@@ -173,7 +172,7 @@ const linux = {
   platform: 'linux',
 
   // Build x64, armv7l, and arm64 binaries.
-  arch: ['x64', 'armv7l', 'arm64']
+  arch: argv.arch || process.arch
 
   // Note: Application icon for Linux is specified via the BrowserWindow `icon` option.
 }
@@ -315,7 +314,7 @@ function buildDarwin (cb) {
     }
 
     function pack (cb) {
-      packageZip() // always produce .zip file, used for automatic updates
+      packageZip() // Include a ZIP for manual downloads and release distribution.
 
       if (argv.package === 'dmg' || argv.package === 'all') {
         packageDmg(cb)
@@ -323,11 +322,11 @@ function buildDarwin (cb) {
     }
 
     function packageZip () {
-      // Create .zip file (used by the auto-updater)
+      // Create an archive for this architecture.
       console.log('Mac: Creating zip...')
 
       const inPath = path.join(buildPath[0], config.APP_NAME + '.app')
-      const outPath = path.join(DIST_PATH, BUILD_NAME + '-darwin.zip')
+      const outPath = path.join(DIST_PATH, BUILD_NAME + '-darwin-' + (argv.arch || process.arch) + '.zip')
       zip.zipSync(inPath, outPath)
 
       console.log('Mac: Created zip.')
@@ -336,7 +335,7 @@ function buildDarwin (cb) {
     function packageDmg (cb) {
       console.log('Mac: Creating dmg...')
 
-      const targetPath = path.join(DIST_PATH, BUILD_NAME + '.dmg')
+      const targetPath = path.join(DIST_PATH, BUILD_NAME + '-darwin-' + (argv.arch || process.arch) + '.dmg')
       const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-dmg-'))
       try {
         cp.execFileSync('ditto', [appPath, path.join(staging, config.APP_NAME + '.app')])
@@ -397,7 +396,7 @@ function buildWin32 (cb) {
         tasks.push((cb) => packagePortable(filesPath, cb))
       }
     })
-    series(tasks, cb)
+    runTasks(tasks).then(() => cb(null), cb)
 
     function packageInstaller (filesPath, cb) {
       console.log('Windows: Creating installer...')
@@ -492,7 +491,7 @@ function buildLinux (cb) {
         tasks.push((cb) => packageZip(filesPath, destArch, cb))
       }
     })
-    series(tasks, cb)
+    runTasks(tasks).then(() => cb(null), cb)
   }).catch(function (err) {
     cb(err)
   })
@@ -598,4 +597,8 @@ function printDone (err) {
  */
 function printWarning () {
   console.log(fs.readFileSync(path.join(__dirname, 'warning.txt'), 'utf8'))
+}
+
+async function runTasks (tasks) {
+  for (const task of tasks) await new Promise((resolve, reject) => task(err => err ? reject(err) : resolve()))
 }

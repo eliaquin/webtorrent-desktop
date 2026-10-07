@@ -2,37 +2,29 @@ const { Button, TextField } = require('./ui')
 const path = require('path')
 
 const colors = require('./ui/colors')
-const remote = require('@electron/remote')
+const native = require('../lib/native-api')
 const React = require('react')
-const PropTypes = require('prop-types')
 
 // Lets you pick a file or directory.
 // Uses the system Open File dialog.
 // You can't edit the text field directly.
+/**
+ * @typedef {{className?: string, dialog?: object, id?: string, onChange?: (path: string) => void, title: string, value?: string}} PathSelectorProps
+ * @extends {React.Component<PathSelectorProps>}
+ */
 class PathSelector extends React.Component {
-  static propTypes () {
-    return {
-      className: PropTypes.string,
-      dialog: PropTypes.object,
-      id: PropTypes.string,
-      onChange: PropTypes.func,
-      title: PropTypes.string.isRequired,
-      value: PropTypes.string
-    }
-  }
-
   constructor (props) {
     super(props)
     this.handleClick = this.handleClick.bind(this)
   }
 
-  handleClick () {
+  async handleClick () {
     const opts = Object.assign({
       defaultPath: path.dirname(this.props.value || ''),
       properties: ['openFile', 'openDirectory']
     }, this.props.dialog)
 
-    const filenames = remote.dialog.showOpenDialogSync(remote.getCurrentWindow(), opts)
+    const filenames = await native.choosePath(opts)
     if (!Array.isArray(filenames)) return
     this.props.onChange && this.props.onChange(filenames[0])
   }

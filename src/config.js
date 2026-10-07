@@ -1,7 +1,6 @@
-const appConfig = require('application-config')('WebTorrent')
+const os = require('os')
 const path = require('path')
 const { app } = require('electron')
-const arch = require('arch')
 
 const APP_NAME = 'WebTorrent'
 const APP_TEAM = 'WebTorrent, LLC'
@@ -18,10 +17,6 @@ const UI_HEADER_HEIGHT = 38
 const UI_TORRENT_HEIGHT = 100
 
 module.exports = {
-  ANNOUNCEMENT_URL: 'https://webtorrent.io/desktop/announcement',
-  AUTO_UPDATE_URL: 'https://webtorrent.io/desktop/update',
-  CRASH_REPORT_URL: 'https://webtorrent.io/desktop/crash-report',
-  TELEMETRY_URL: 'https://webtorrent.io/desktop/telemetry',
 
   APP_COPYRIGHT: `Copyright © 2014-${new Date().getFullYear()} ${APP_TEAM}`,
   APP_FILE_ICON: path.join(__dirname, '..', 'static', 'WebTorrentFile'),
@@ -69,11 +64,12 @@ module.exports = {
   DELAYED_INIT: 3000 /* 3 seconds */,
 
   DEFAULT_DOWNLOAD_PATH: getDefaultDownloadPath(),
+  DEFAULT_TRACKERS: [], // Filled from create-torrent during main-process state initialization.
 
-  GITHUB_URL: 'https://github.com/webtorrent/webtorrent-desktop',
-  GITHUB_URL_ISSUES: 'https://github.com/webtorrent/webtorrent-desktop/issues',
-  GITHUB_URL_RAW: 'https://raw.githubusercontent.com/webtorrent/webtorrent-desktop/master',
-  GITHUB_URL_RELEASES: 'https://github.com/webtorrent/webtorrent-desktop/releases',
+  GITHUB_URL: 'https://github.com/eliaquin/webtorrent-desktop',
+  GITHUB_URL_ISSUES: 'https://github.com/eliaquin/webtorrent-desktop/issues',
+  GITHUB_URL_RAW: 'https://raw.githubusercontent.com/eliaquin/webtorrent-desktop/main',
+  GITHUB_URL_RELEASES: 'https://github.com/eliaquin/webtorrent-desktop/releases',
 
   HOME_PAGE_URL: 'https://webtorrent.io',
   TWITTER_PAGE_URL: 'https://twitter.com/WebTorrentApp',
@@ -82,7 +78,7 @@ module.exports = {
   IS_PRODUCTION,
   IS_TEST,
 
-  OS_SYSARCH: arch() === 'x64' ? 'x64' : 'ia32',
+  OS_SYSARCH: process.arch,
 
   POSTER_PATH: path.join(getConfigPath(), 'Posters'),
   ROOT_PATH: path.join(__dirname, '..'),
@@ -91,7 +87,6 @@ module.exports = {
 
   WINDOW_ABOUT: 'file://' + path.join(__dirname, '..', 'static', 'about.html'),
   WINDOW_MAIN: 'file://' + path.join(__dirname, '..', 'static', 'main.html'),
-  WINDOW_WEBTORRENT: 'file://' + path.join(__dirname, '..', 'static', 'webtorrent.html'),
 
   WINDOW_INITIAL_BOUNDS: {
     width: 500,
@@ -105,10 +100,13 @@ module.exports = {
 }
 
 function getConfigPath () {
+  if (process.env.WEBTORRENT_CONFIG_PATH) return process.env.WEBTORRENT_CONFIG_PATH
   if (IS_PORTABLE) {
     return PORTABLE_PATH
   } else {
-    return path.dirname(appConfig.filePath)
+    if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', APP_NAME)
+    if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'Local Settings', 'Application Data'), APP_NAME)
+    return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), APP_NAME)
   }
 }
 
@@ -121,12 +119,10 @@ function getDefaultDownloadPath () {
 }
 
 function getPath (key) {
+  if (process.type === 'utility') return process.env.WEBTORRENT_DOWNLOAD_PATH || ''
   if (!process.versions.electron) {
     // Node.js process
     return ''
-  } else if (process.type === 'renderer') {
-    // Electron renderer process
-    return require('@electron/remote').app.getPath(key)
   } else {
     // Electron main process
     return app.getPath(key)

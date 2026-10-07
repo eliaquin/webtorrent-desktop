@@ -1,6 +1,7 @@
 /* globals document, window */
 
 // Exercise the React UI in Electron's real DOM without a WebDriver dependency.
+process.env.NODE_ENV = 'test'
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs')
 const os = require('os')
@@ -13,7 +14,6 @@ const fixture = path.join(tempDir, 'index.html')
 const stylesheet = pathToFileURL(path.join(projectRoot, 'static', 'main.css')).href
 fs.writeFileSync(fixture, `<!doctype html><link rel="stylesheet" href="${stylesheet}"><div id="body"></div>`)
 
-require('@electron/remote/main').initialize()
 const timeout = setTimeout(() => {
   console.error('UI tests timed out')
   finish(1)
@@ -32,7 +32,6 @@ app.whenReady().then(async () => {
     height: 800,
     webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false }
   })
-  require('@electron/remote/main').enable(win.webContents)
   await win.loadFile(fixture)
   const result = await win.webContents.executeJavaScript(`(${runUI.toString()})(${JSON.stringify(projectRoot)})`)
   console.log(result)
@@ -55,7 +54,7 @@ async function runUI (projectRoot) {
   const { Button, Checkbox, TextField, ProgressBar } = require(projectRoot + '/build/renderer/components/ui')
   const App = require(projectRoot + '/build/renderer/pages/app')
   const dispatcher = require(projectRoot + '/build/renderer/lib/dispatcher')
-  const { clipboard } = require(projectRoot + '/node_modules/@electron/remote')
+  const { clipboard } = require(projectRoot + '/build/renderer/lib/native-api')
   const root = createRoot(document.querySelector('#body'))
   const h = React.createElement
   const act = React.act
@@ -101,7 +100,8 @@ async function runUI (projectRoot) {
   input.focus()
   assert.strictEqual(document.activeElement, input, 'field can be focused')
 
-  const state = {
+  const store = require(projectRoot + '/build/renderer/lib/store').createStore({
+    playing: require(projectRoot + '/build/renderer/lib/state').getDefaultPlayState(),
     location: { url: () => 'preferences', hasBack: () => false, hasForward: () => false },
     window: { title: 'WebTorrent', isFocused: true },
     errors: [],
@@ -109,9 +109,10 @@ async function runUI (projectRoot) {
     getGlobalTrackers: () => ['https://tracker.example/announce'],
     getExternalPlayerName: () => 'VLC',
     shouldHidePlayerControls: () => false
-  }
+  })
+  const state = store.state
   events.length = 0
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   const sounds = [...document.querySelectorAll('.ui-checkbox')].find(el => el.textContent === 'Enable sounds')
   await click(sounds)
   assert.deepStrictEqual(events.pop(), ['updatePreferences', 'soundNotifications', true])
@@ -126,12 +127,12 @@ async function runUI (projectRoot) {
   assert.strictEqual(document.querySelector('label[for="download-location"]').control, downloadPath)
   state.window.title = 'Updated title'
   state.saved.prefs.soundNotifications = true
-  await render(h(App, { state }))
-  assert(sounds.querySelector('input').checked, 'mutable state updates render through createRoot')
+  await render(h(App, { store }))
+  assert(sounds.querySelector('input').checked, 'store subscriptions update preferences')
 
   state.location.url = () => 'create-torrent'
   state.location.current = () => ({ files: [{ name: 'seed.bin', path: '/tmp/seed.bin', size: 128 }] })
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   await click(button('Show advanced settings...'))
   await click(document.querySelector('.torrent-is-private input'))
   await type(document.querySelector('[aria-label="Trackers"]'), 'https://tracker.example/announce')
@@ -145,7 +146,7 @@ async function runUI (projectRoot) {
 
   state.location.url = () => 'home'
   state.saved.torrents = [{ torrentKey: 1, infoHash: 'abc', name: 'Example download', status: 'downloading', files: [], progress: { progress: 0.5, downloaded: 128, length: 256, numPeers: 0, downloadSpeed: 0, uploadSpeed: 0, ready: true } }]
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   events.length = 0
   await click(document.querySelector('.download'))
   assert.deepStrictEqual(events, [['toggleTorrent', 'abc']], 'download control does not select the torrent row')
@@ -157,13 +158,13 @@ async function runUI (projectRoot) {
     events.push(args)
     if (args[0] === 'exitModal') {
       state.modal = null
-      root.render(h(App, { state }))
+      root.render(h(App, { store }))
     }
   })
   try {
     clipboard.readText = () => magnet
     state.modal = { id: 'open-torrent-address-modal' }
-    await render(h(App, { state }))
+    await render(h(App, { store }))
     const address = document.querySelector('#torrent-address-field')
     assert.strictEqual(document.activeElement, address, 'address modal focuses its input')
     assert.strictEqual(address.value, magnet, 'magnet link is pasted from the clipboard')
@@ -173,7 +174,7 @@ async function runUI (projectRoot) {
     assert.deepStrictEqual(events, [['exitModal'], ['addTorrent', magnet]], 'Enter submits the magnet link')
     assert.strictEqual(document.querySelector('[role="dialog"]'), null, 'Enter closes the modal')
     state.modal = { id: 'open-torrent-address-modal' }
-    await render(h(App, { state }))
+    await render(h(App, { store }))
     await click(button('CANCEL'))
     assert.deepStrictEqual(events.pop(), ['exitModal'], 'cancel closes the modal')
     assert.strictEqual(document.querySelector('[role="dialog"]'), null)
@@ -193,10 +194,10 @@ async function runUI (projectRoot) {
   Object.assign(state.playing, { type: 'video', infoHash: torrent.infoHash, fileIndex: 0, fileName: 'example.mp4' })
   state.playing.subtitles.tracks = [{ label: 'English' }, { label: 'English (Forced)' }]
   state.playing.subtitles.selectedIndex = 0
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   assert.strictEqual(document.querySelector('.subtitle-track-label').textContent, 'English', 'selected subtitle appears next to CC')
   state.playing.subtitles.selectedIndex = 1
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   const captions = document.querySelector('.subtitle-control')
   assert.strictEqual(captions.querySelector('.subtitle-track-label').textContent, 'English (Forced)')
   assert.strictEqual(captions.title, 'Subtitles: English (Forced)', 'hover exposes the complete label')
@@ -204,12 +205,12 @@ async function runUI (projectRoot) {
   await click(captions)
   assert.deepStrictEqual(events.pop(), ['toggleSubtitlesMenu'], 'the caption label opens the subtitle menu')
   state.playing.subtitles.selectedIndex = -1
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   assert.strictEqual(document.querySelector('.subtitle-track-label'), null, 'Off clears the subtitle label')
   state.playing.subtitles.tracks = []
-  await render(h(App, { state }))
+  await render(h(App, { store }))
   assert.strictEqual(document.querySelector('.subtitle-control').getAttribute('aria-label'), 'Closed captions')
   state.location.url = () => 'preferences'
-  await render(h(App, { state }))
-  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modal focus/paste/Enter/cancel, React root updates, selected subtitle label'
+  await render(h(App, { store }))
+  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modal focus/paste/Enter/cancel, scoped store updates, selected subtitle label'
 }

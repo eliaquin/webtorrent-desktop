@@ -1,5 +1,6 @@
 /* globals document */
 
+process.env.NODE_ENV = 'test'
 const { app, BrowserWindow } = require('electron')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -21,7 +22,6 @@ execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'color=s
   '-metadata:s:s:0', 'language=eng', '-disposition:s:0', 'default',
   '-metadata:s:s:1', 'language=eng', '-metadata:s:s:1', 'title=Forced', '-disposition:s:1', 'forced',
   '-metadata:s:s:2', 'language=fre', '-disposition:s:2', '0', fixture])
-require('@electron/remote/main').initialize()
 const timeout = setTimeout(() => finish(new Error('Subtitle tests timed out')), 30000)
 
 function finish (err) {
@@ -33,7 +33,6 @@ function finish (err) {
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: true, contextIsolation: false } })
-  require('@electron/remote/main').enable(win.webContents)
   await win.loadFile(html)
   const media = pathToFileURL(path.join(projectRoot, 'test/resources/monitor-test.mp4')).href
   console.log(await win.webContents.executeJavaScript(`(${runTests.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(fixture)}, ${JSON.stringify(media)}, ${JSON.stringify(process.env.EMBEDDED_SUBTITLE_TEST_FILE || '')})`))
@@ -43,7 +42,8 @@ app.whenReady().then(async () => {
 async function runTests (projectRoot, fixture, media, realFile) {
   const assert = require('assert')
   const path = require('path')
-  const { extractEmbeddedSubtitles } = require(projectRoot + '/build/renderer/lib/embedded-subtitles')
+  const { extractEmbeddedSubtitles } = require(projectRoot + '/build/engine/embedded-subtitles')
+  require(projectRoot + '/build/renderer/lib/native-api').extractEmbeddedSubtitles = extractEmbeddedSubtitles
   const SubtitlesController = require(projectRoot + '/build/renderer/controllers/subtitles-controller')
   const dispatcher = require(projectRoot + '/build/renderer/lib/dispatcher')
   const errors = []

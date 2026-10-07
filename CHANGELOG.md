@@ -1,3 +1,14 @@
+## 0.25.0 — personal fork modernization
+
+- Upgrade WebTorrent to 3.0.21 and migrate torrent/casting/media work to a utility process.
+- Remove Electron remote; sandbox the UI behind an explicit preload/IPC bridge.
+- Replace global UI state and interval rendering with scoped React subscriptions.
+- Use esbuild and built-in Node APIs; retire Babel, obsolete wrappers and screenshot fixtures.
+- Add deterministic Playwright playback/export/resume checks and local TCP peer tests.
+- Preserve profiles/downloads during build cleanup; add atomic saves and profile backups.
+- Use personal-fork metadata/releases, local diagnostics and disabled crash uploads.
+- Fix silent-video handling, streaming server recreation and stale casting updates; move media side effects into React lifecycle methods.
+
 # WebTorrent Desktop Version History
 
 ## v0.24.0 - 2020-08-28

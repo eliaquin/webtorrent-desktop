@@ -6,14 +6,13 @@ console.time('init')
 const State = require('./lib/state')
 State.load(onState)
 
-const createGetter = require('fn-getter')
-const debounce = require('debounce')
+const createGetter = require('../shared/lazy')
+const debounce = require('../shared/debounce')
 const dragDrop = require('drag-drop')
 const electron = require('electron')
-const fs = require('fs')
 const React = require('react')
 const { createRoot } = require('react-dom/client')
-const remote = require('@electron/remote')
+const native = require('./lib/native-api')
 
 const config = require('../config')
 const telemetry = require('./lib/telemetry')
@@ -24,6 +23,7 @@ const TorrentPlayer = require('./lib/torrent-player')
 const TorrentListController = require('./controllers/torrent-list-controller')
 
 const App = require('./pages/app')
+const { createStore } = require('./lib/store')
 
 // Electron apps have two processes: a main process (node) runs first and starts
 // a renderer process (essentially a Chrome window). We're in the renderer process,
@@ -46,6 +46,9 @@ let state
 
 // React root, shared by the initial render and subsequent state updates
 let root
+let store
+let controlsTimer
+let lastControlsActivity
 
 // Called once when the application loads. (Not once per window.)
 // Connects to the torrent networks, sets up the UI and OS integrations like
@@ -54,8 +57,8 @@ function onState (err, _state) {
   if (err) return onError(err)
 
   // Make available for easier debugging
-  state = window.state = _state
-  window.dispatch = dispatch
+  store = createStore(_state)
+  state = store.state
 
   telemetry.init(state)
   sound.init(state)
@@ -119,12 +122,8 @@ function onState (err, _state) {
 
   // Initialize React once; render new props whenever the shared state changes.
   root = createRoot(document.querySelector('#body'))
-  root.render(<App state={state} />)
-
-  // Calling update() updates the UI given the current state
-  // Do this at least once a second to give every file in every torrentSummary
-  // a progress bar and to keep the cursor in sync when playing a video
-  setInterval(update, 1000)
+  root.render(<App store={store} />)
+  store.subscribe(['playing', 'saved.torrents', 'window', 'dock'], update)
 
   // Listen for messages from the main process
   setupIpc()
@@ -157,7 +156,7 @@ function onState (err, _state) {
   window.addEventListener('focus', onFocus)
   window.addEventListener('blur', onBlur)
 
-  if (remote.getCurrentWindow().isVisible()) {
+  if (native.windowState().isVisible) {
     sound.play('STARTUP')
   }
 
@@ -170,12 +169,6 @@ function onState (err, _state) {
 
 // Runs a few seconds after the app loads, to avoid slowing down startup time
 function delayedInit () {
-  telemetry.send(state)
-
-  // Send telemetry data every 12 hours, for users who keep the app running
-  // for extended periods of time
-  setInterval(() => telemetry.send(state), 12 * 3600 * 1000)
-
   // Warn if the download dir is gone, eg b/c an external drive is unplugged
   checkDownloadPath()
 
@@ -203,7 +196,12 @@ function lazyLoadCast () {
 function update () {
   controllers.playback().showOrHidePlayerControls()
   controllers.subtitles().checkForEmbeddedSubtitles()
-  root.render(<App state={state} />)
+  const activity = state.playing.mouseStationarySince
+  if (activity !== lastControlsActivity) {
+    lastControlsActivity = activity
+    clearTimeout(controlsTimer)
+    if (activity) controlsTimer = setTimeout(() => controllers.playback().showOrHidePlayerControls(), Math.max(0, activity + 2001 - Date.now()))
+  }
   updateElectron()
 }
 
@@ -287,7 +285,8 @@ const dispatchHandlers = {
   mediaStalled: () => controllers.media().mediaStalled(),
   mediaError: (err) => controllers.media().mediaError(err),
   mediaSuccess: () => controllers.media().mediaSuccess(),
-  mediaTimeUpdate: () => controllers.media().mediaTimeUpdate(),
+  mediaTimeUpdate: data => controllers.media().mediaTimeUpdate(data),
+  mediaVolumeChanged: volume => controllers.media().mediaVolumeChanged(volume),
   mediaMouseMoved: () => controllers.media().mediaMouseMoved(),
   mediaControlsMouseEnter: () => controllers.media().controlsMouseEnter(),
   mediaControlsMouseLeave: () => controllers.media().controlsMouseLeave(),
@@ -426,7 +425,7 @@ function resumeTorrents () {
 // Set window dimensions to match video dimensions or fill the screen
 function setDimensions (dimensions) {
   // Don't modify the window size if it's already maximized
-  if (remote.getCurrentWindow().isMaximized()) {
+  if (native.windowState().isMaximized) {
     state.window.bounds = null
     return
   }
@@ -438,7 +437,7 @@ function setDimensions (dimensions) {
     width: window.outerWidth,
     height: window.outerHeight
   }
-  state.window.wasMaximized = remote.getCurrentWindow().isMaximized()
+  state.window.wasMaximized = native.windowState().isMaximized
 
   // Limit window size to screen size
   const screenWidth = window.screen.width
@@ -470,7 +469,7 @@ function onOpen (files) {
   // File API seems to transform "magnet:?foo" in "magnet:///?foo"
   // this is a sanitization
   files = files.map(file => {
-    if (typeof file !== 'string') return file
+    if (typeof file !== 'string') return window.webtorrent ? window.webtorrent.pathForFile(file) : file
     return file.replace(/^magnet:\/+\?/i, 'magnet:?')
   })
 
@@ -513,7 +512,7 @@ const editableHtmlTags = new Set(['input', 'textarea'])
 
 function onPaste (e) {
   if (e && editableHtmlTags.has(e.target.tagName.toLowerCase())) return
-  controllers.torrentList().addTorrent(remote.clipboard.readText())
+  controllers.torrentList().addTorrent(native.clipboard.readText())
 
   update()
 }
@@ -581,13 +580,12 @@ function onWindowBoundsChanged (e, newBounds) {
   }
 }
 
-function checkDownloadPath () {
-  fs.stat(state.saved.prefs.downloadPath, (err, stat) => {
-    if (err) {
-      state.downloadPathStatus = 'missing'
-      return console.error(err)
-    }
-    if (stat.isDirectory()) state.downloadPathStatus = 'ok'
-    else state.downloadPathStatus = 'missing'
-  })
+async function checkDownloadPath () {
+  try {
+    const stat = await native.statPath(state.saved.prefs.downloadPath)
+    state.downloadPathStatus = stat.isDirectory ? 'ok' : 'missing'
+  } catch (err) {
+    state.downloadPathStatus = 'missing'
+    console.error(err)
+  }
 }

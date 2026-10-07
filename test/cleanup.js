@@ -1,0 +1,33 @@
+const assert = require('assert')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { execFileSync, spawnSync } = require('child_process')
+
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-cleanup-'))
+try {
+  const profile = path.join(directory, 'Profile')
+  const downloads = path.join(profile, 'Downloads')
+  for (const folder of ['build', 'dist/backups', 'Profile/Downloads', 'Profile/Posters', 'Profile/Torrents']) fs.mkdirSync(path.join(directory, folder), { recursive: true })
+  fs.writeFileSync(path.join(directory, 'build', 'generated.js'), 'generated')
+  fs.writeFileSync(path.join(directory, 'dist/backups', 'previous.txt'), 'previous build')
+  fs.writeFileSync(path.join(downloads, 'video.mkv'), 'downloaded content')
+  fs.writeFileSync(path.join(profile, 'Posters', 'cached.jpg'), 'cached')
+  fs.writeFileSync(path.join(profile, 'config.json'), JSON.stringify({ prefs: { downloadPath: downloads }, torrents: [] }))
+  const clean = path.join(__dirname, '../bin/clean.js')
+  execFileSync(process.execPath, [clean], { cwd: directory })
+  assert(!fs.existsSync(path.join(directory, 'build')))
+  assert(fs.existsSync(path.join(directory, 'dist/backups', 'previous.txt')))
+  assert(fs.existsSync(path.join(profile, 'config.json')))
+  const reset = path.join(__dirname, '../bin/reset.js')
+  const env = { ...process.env, NODE_ENV: 'test', WEBTORRENT_TEST_DIR: profile }
+  assert.strictEqual(spawnSync(process.execPath, [reset], { env }).status, 1, 'reset requires the explicit reset flag')
+  assert(fs.existsSync(path.join(profile, 'config.json')))
+  execFileSync(process.execPath, [reset, '--confirm-profile-reset'], { env })
+  assert(!fs.existsSync(path.join(profile, 'config.json')))
+  assert(!fs.existsSync(path.join(profile, 'Posters')))
+  assert.strictEqual(fs.readFileSync(path.join(downloads, 'video.mkv'), 'utf8'), 'downloaded content', 'portable downloads survive a reset')
+  console.log('Cleanup tests passed: build-only cleanup, retained backups, guarded reset and preserved portable downloads')
+} finally {
+  fs.rmSync(directory, { recursive: true, force: true })
+}

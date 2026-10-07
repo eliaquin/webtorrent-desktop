@@ -8,10 +8,7 @@ const { app, ipcMain } = require('electron')
 const log = require('./log')
 const menu = require('./menu')
 const windows = require('./windows')
-const config = require('../config')
-
-// Messages from the main process, to be sent once the WebTorrent process starts
-const messageQueueMainToWebTorrent = []
+const trustedSender = require('./ipc-sender')
 
 // Will hold modules injected from the app that will be used on fired
 // IPC events.
@@ -25,16 +22,6 @@ function init () {
   ipcMain.once('ipcReady', e => {
     app.ipcReady = true
     app.emit('ipcReady')
-  })
-
-  ipcMain.once('ipcReadyWebTorrent', e => {
-    app.ipcReadyWebTorrent = true
-    log('sending %d queued messages from the main win to the webtorrent window',
-      messageQueueMainToWebTorrent.length)
-    messageQueueMainToWebTorrent.forEach(message => {
-      windows.webtorrent.send(message.name, ...message.args)
-      log('webtorrent: sent queued %s', message.name)
-    })
   })
 
   /**
@@ -222,30 +209,10 @@ function init () {
   const oldEmit = ipcMain.emit
   ipcMain.emit = (name, e, ...args) => {
     if (e && e.sender) {
-      const allowed = [windows.main.win, windows.webtorrent.win, windows.about.win].filter(Boolean)
-      const frame = e.senderFrame
-      if (!allowed.some(win => win.webContents === e.sender) || !frame || frame.parent ||
-          ![config.WINDOW_MAIN, config.WINDOW_WEBTORRENT, config.WINDOW_ABOUT].map(url => new URL(url).href).includes(frame.url)) return false
+      if (!trustedSender(e)) return false
     }
-    // Relay messages between the main window and the WebTorrent hidden window
     if (name.startsWith('wt-') && !app.isQuitting) {
-      console.dir(e.sender.getTitle())
-      if (windows.webtorrent.win && e.sender === windows.webtorrent.win.webContents) {
-        // Send message to main window
-        windows.main.send(name, ...args)
-        log('webtorrent: got %s', name)
-      } else if (app.ipcReadyWebTorrent) {
-        // Send message to webtorrent window
-        windows.webtorrent.send(name, ...args)
-        log('webtorrent: sent %s', name)
-      } else {
-        // Queue message for webtorrent window, it hasn't finished loading yet
-        messageQueueMainToWebTorrent.push({
-          name,
-          args
-        })
-        log('webtorrent: queueing %s', name)
-      }
+      require('./torrent-service').send(name, ...args)
       return
     }
 

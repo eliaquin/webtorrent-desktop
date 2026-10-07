@@ -8,7 +8,7 @@ function init () {
 
   crashReporter.start({
     productName: config.APP_NAME,
-    submitURL: config.CRASH_REPORT_URL,
+    uploadToServer: false,
     globalExtra: { _companyName: config.APP_NAME },
     compress: true
   })

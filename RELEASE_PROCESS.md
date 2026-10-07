@@ -1,109 +1,50 @@
-## Release Process
+# Releasing the personal fork
 
-### 1. Create a new version
+Releases belong to `eliaquin/webtorrent-desktop`. The app checks this repository
+for newer stable releases and opens its download page. It does not install
+upstream WebTorrent builds or consume the old upstream update feed.
 
-- Update `AUTHORS`
+1. Use Node 24 LTS and run `npm ci`, then `npm run test-all`. FFmpeg is required
+   for media tests; run Electron suites under Xvfb on Linux.
+2. Update `CHANGELOG.md` and the package version with
+   `npm version patch --no-git-tag-version` (or the appropriate minor/major bump).
+   Commit the source and lockfile changes, merge to `main`, tag the resulting
+   commit as `v<version>`, and push that tag to the personal fork.
+3. Build on each target platform, using that platform's native architecture:
 
-  ```
-  npm run update-authors
-  ```
+   ```sh
+   npm run package -- darwin --arch arm64 --sign
+   npm run package -- win32 --arch x64 --sign
+   npm run package -- linux --arch x64
+   ```
 
-  Commit if necessary. The commit message should be "authors".
+   Run each command on its corresponding OS. Native torrent/WebRTC modules must
+   match the target architecture; cross-building is not validated. Electron 44
+   supports macOS x64/arm64, Linux x64/arm64 and Windows x64/arm64; the retired
+   32-bit ARM Linux target is no longer built by default.
 
-- Write the changelog
+   Public macOS builds require `APPLE_SIGNING_IDENTITY` and
+   `APPLE_NOTARY_PROFILE` (a `notarytool` keychain profile). Public Windows
+   installers require the signing certificate/password expected by
+   `bin/package.js`. An ad hoc macOS signature is suitable for a local build,
+   but is not a substitute for Developer ID signing and notarization.
+4. Smoke-test the packaged application, including local torrent creation,
+   streaming, seeking, embedded and external subtitles, pause/resume, preferences,
+   export, casting and OS integrations. The automated packaged smoke check is:
 
-  You can use `git log --oneline <last version tag>..HEAD` to get a list of changes.
+   ```sh
+   WEBTORRENT_PACKAGED_APP="/absolute/path/to/WebTorrent.app/Contents/MacOS/WebTorrent" npm run test-integration
+   ```
 
-  Summarize them concisely in `CHANGELOG.md`. The commit  message should be "changelog".
+   Physical casting and OS-specific integrations still need a device check.
+   Verify downloads with Gatekeeper/SmartScreen on the actual target platform.
+5. Collect the current-version artifacts in `dist/`, run `npm run checksums`,
+   then explicitly run `npm run release` to create a **draft** GitHub release
+   with the GitHub CLI. The command requires an already-pushed version tag and
+   attaches only the current version's artifacts. Review assets and signatures
+   before publishing the draft through GitHub.
 
-- Update the version
-
-  ```
-  npm version [major|minor|patch]
-  ```
-
-  This creates both a commit and a git tag.
-
-- Make a PR
-
-  Once the PR is reviewed, merge it:
-
-  ```
-  git push origin <branch-name>:master
-  ```
-
-  This makes it so that the commit hash on master matches the commit hash of the version tag.
-
-  Finally, run:
-
-  ```
-  git push --tags
-  ```
-
-### 2. Create the release binaries
-
-- On a Mac:
-
-  ```
-  npm run package -- darwin --sign
-  ```
-
-  Move the `.zip` and `.dmg` file somewhere because the next step wipes the `dist/` folder away.
-
-  ```
-  npm run package -- linux --sign
-  ```
-
-- On Windows, or in a Windows VM:
-
-  ```
-  npm run package -- win32 --sign
-  ```
-
-- Then, upload the release binaries to Github:
-
-  ```
-  npm run gh-release
-  ```
-
-  Follow the URL to a newly created Github release page. Manually upload the binaries from
-  `webtorrent-desktop/dist/`. Open the previous release in another tab, and make sure that you
-  are uploading the same set of files, no more, no less.
-
-### 3. Test it
-
-**This is the most important part.**
-
-- Manually download the binaries for each platform from Github.
-
-  **Do not use your locally built binaries.** Modern OSs treat executables differently if they've
-  been downloaded, even though the files are byte for byte identical. This ensures that the
-  codesigning worked and is valid.
-
-- Smoke test WebTorrent Desktop on each platform. Before a release, check that the following basic use cases work correctly:
-
-  1. Click "Play" to stream a built-in torrent (e.g. Sintel)
-    - Ensure that seeking to undownloaded region works and plays immediately.
-    - Ensure that sintel.mp4 gets downloaded to `~/Downloads`.
-
-  2. Check that the auto-updater works
-    - Open the console and check for the line "No update available" to indicate that the auto-updater is working. (If the auto updater does not run, users will successfully auto update to this new version, and then be stuck there forever.)
-
-  3. Add a new .torrent file via drag-and-drop.
-    - Ensure that it gets added to the list and starts downloading.
-
-  4. Remove a torrent from the client
-    - Ensure that the file is removed from `~/Downloads`
-
-  5. Create and seed a new a torrent via drag-and-drop.
-    - Ensure that the torrent gets created and seeding begins.
-
-### 4. Ship it
-
-- Update the website
-
-  Create a pull request in [webtorrent.io](https://github.com/webtorrent/webtorrent.io). Update
-  `config.js`, updating the desktop app version.
-
-  Once this PR is merged and Feross redeploys the WebTorrent website,
-  hundreds of thousands of users around the world will start auto updating. **Merge with care.**
+Packaging preserves `dist/backups/`. `npm run clean` only removes generated
+`build/` files. To reset the app profile, quit the app and explicitly run
+`npm run reset-app -- --confirm-profile-reset`; that command preserves downloads
+but removes settings, history and cached metadata.

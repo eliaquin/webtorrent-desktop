@@ -30,14 +30,13 @@ function init () {
       nodeIntegration: false,
       contextIsolation: true,
       enableBlinkFeatures: 'AudioVideoTracks',
-      sandbox: false,
+      sandbox: true,
       preload: path.join(__dirname, '../../renderer/preload-about.js'),
       backgroundThrottling: false
     },
     width: 300
   })
   secureWindow(win)
-  require('@electron/remote/main').enable(win.webContents)
 
   win.loadURL(config.WINDOW_ABOUT)
 

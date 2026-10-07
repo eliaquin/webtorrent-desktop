@@ -1,0 +1,8 @@
+{
+  "name": "@webtorrent-desktop/ip-set-compat",
+  "version": "1.0.0",
+  "description": "Legacy blocklist API backed by Node's native IPv4/IPv6 BlockList",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": { "ipaddr.js": "2.5.0" }
+}

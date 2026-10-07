@@ -1,5 +1,5 @@
 const { Button, TextField, Checkbox } = require('../components/ui')
-const createTorrent = require('create-torrent')
+const config = require('../../config')
 const path = require('path')
 const prettyBytes = require('prettier-bytes')
 const React = require('react')
@@ -48,7 +48,7 @@ class CreateTorrentPage extends React.Component {
     }
 
     // Default trackers
-    const trackers = createTorrent.announceList.join('\n')
+    const trackers = config.DEFAULT_TRACKERS.join('\n')
 
     this.state = {
       comment: '',

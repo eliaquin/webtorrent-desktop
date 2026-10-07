@@ -22,8 +22,14 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
       - run: npm test
+      - run: npm run test-cleanup
+      - run: npm run test-store
+      - run: npm run test-torrent
       - run: npm run audit
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+      - run: node -e 'require("electron")'
+      - run: sudo chown root:root node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
       - run: xvfb-run -a npm run test-security
       - run: xvfb-run -a npm run test-ui
       - run: xvfb-run -a npm run test-subtitles
+      - run: xvfb-run -a npm run test-integration

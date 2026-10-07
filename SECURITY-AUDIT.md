@@ -15,7 +15,7 @@ severity filters were used to achieve this result.
 | IP classification | Replaced unpatched `ip` with a small local compatibility module using `ipaddr.js`; regression checks cover alternative loopback and IPv4-mapped IPv6 representations. |
 | Media metadata | Upgraded music-metadata to 12.0.0 and adapted asynchronous ESM loading. |
 | Development and packaging | Replaced Spectron with Playwright, migrated Electron packaging/signing tools, removed obsolete dependency scanners and watchers, and replaced appdmg with macOS built-in tools. |
-| Other transitive dependencies | Updated Babel and pinned patched Browserslist, temporary-file and trim-newlines dependencies. |
+| Other dependencies | Retired Babel in favor of esbuild and pinned patched temporary-file and trim-newlines dependencies. |
 
 Node 24 is the recommended development runtime. Clean lockfile installs are used
 in CI and packaging. GitHub Actions are pinned to verified commit hashes, with
@@ -24,8 +24,10 @@ workflow permissions limited to their tasks.
 ## Application hardening
 
 - Disabled page Node integration and enabled context isolation in all app windows.
-  Trusted application code runs in isolated preloads.
-- Removed inline page scripts and added restrictive content security policies.
+  Windows now also use Chromium sandboxing. A small isolated preload exposes
+  allowlisted commands; Node filesystem/network work runs outside the renderer.
+- Removed inline page scripts and added restrictive content security policies;
+  the browser UI loads a local esbuild bundle.
   Blocked remote navigation, popups, webviews and permission requests.
 - Validated IPC sender identity and local top-level frame URLs; a spoofed window
   title no longer grants access to privileged messages.
@@ -51,10 +53,16 @@ notarization. The previous installed app is retained under `dist/backups/`.
 
 ## Remaining limits
 
-The isolated preloads still use `sandbox: false` because the legacy application
-performs filesystem and networking work there. Moving these operations into
-utility processes and exposing narrowly scoped IPC would improve containment;
-that architectural migration is not completed by this remediation.
+The subsequent 0.25.0 modernization completed the architectural migration:
+`@electron/remote` and the hidden torrent window are removed; both UI windows
+use `sandbox: true`. Torrent/casting/media processing runs in a utility process,
+while native dialogs and atomic profile persistence remain in the main process.
+Playwright now verifies sandboxed video playback, embedded cues, seeking, export
+and pause/resume, and local TCP tests verify real transfer and recheck/resume.
+
+Known casting compatibility packages still require patched XML/protobuf overrides.
+Blocklists use a native Node `BlockList` adapter, including IPv6, rather than the
+upstream IP-set install script that forces a different package manager.
 
 Physical Chromecast, AirPlay and DLNA devices and Windows/Linux packages were
 not available for local validation. Parser and authorization compatibility were

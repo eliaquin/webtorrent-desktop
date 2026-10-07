@@ -1,19 +1,16 @@
 console.time('init')
 
-require('@electron/remote/main').initialize()
 const { app, ipcMain } = require('electron')
 
 // Start crash reporter early, so it takes effect for child processes
 const crashReporter = require('../crash-reporter')
 crashReporter.init()
 
-const parallel = require('run-parallel')
-
 const config = require('../config')
 const ipc = require('./ipc')
 const log = require('./log')
 const menu = require('./menu')
-const State = require('../renderer/lib/state')
+const State = require('./state')
 const windows = require('./windows')
 
 const WEBTORRENT_VERSION = require('webtorrent/package.json').version
@@ -27,7 +24,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 // Start the app without showing the main window when auto launching on login
 // (On Windows and Linux, we get a flag. On MacOS, we get special API.)
 const hidden = argv.includes('--hidden') ||
-  (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAsHidden)
+  (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin)
 
 if (config.IS_PRODUCTION && !config.IS_TEST) {
   // When Electron is running in production mode (packaged app), then run React
@@ -71,10 +68,10 @@ function init () {
   app.ipcReady = false // main window has finished loading and IPC is ready
   app.isQuitting = false
 
-  parallel({
-    appReady: (cb) => app.on('ready', () => cb(null)),
-    state: (cb) => State.load(cb)
-  }, onReady)
+  Promise.all([
+    app.whenReady(),
+    State.load()
+  ]).then(([, state]) => onReady(null, { state }), onReady)
 
   function onReady (err, results) {
     if (err) throw err
@@ -84,7 +81,7 @@ function init () {
 
     menu.init()
     windows.main.init(state, { hidden })
-    windows.webtorrent.init()
+    require('./torrent-service').init()
 
     // To keep app startup fast, some code is delayed.
     setTimeout(() => {
@@ -109,6 +106,7 @@ function init () {
   app.on('open-url', onOpen)
 
   ipc.init()
+  require('./native-api').init()
 
   app.once('ipcReady', () => {
     log('Command line args:', argv)
@@ -137,13 +135,11 @@ function init () {
 function delayedInit (state) {
   if (app.isQuitting) return
 
-  const announcement = require('./announcement')
   const dock = require('./dock')
   const updater = require('./updater')
   const FolderWatcher = require('./folder-watcher')
   const folderWatcher = new FolderWatcher({ window: windows.main, state })
 
-  if (!config.IS_TEST) announcement.init()
   dock.init()
   if (!config.IS_TEST) updater.init()
 
@@ -224,9 +220,7 @@ function processArgv (argv) {
       // Ignore Mac launchd "process serial number" argument
       // Issue: https://github.com/webtorrent/webtorrent-desktop/issues/214
     } else if (arg.startsWith('--')) {
-      // Ignore Spectron flags
-    } else if (arg === 'data:,') {
-      // Ignore weird Spectron argument
+      // Ignore runtime/debugging switches
     } else if (arg !== '.') {
       // Ignore '.' argument, which gets misinterpreted as a torrent id, when a
       // development copy of WebTorrent is started while a production version is

@@ -1,4 +1,4 @@
-const createGetter = require('fn-getter')
+const createGetter = require('../../shared/lazy')
 const React = require('react')
 
 const Header = require('../components/header')
@@ -24,73 +24,86 @@ const Modals = {
       createGetter(() => require('../components/delete-all-torrents-modal'))
 }
 
-class App extends React.Component {
-  render () {
-    const state = this.props.state
+const { createStore } = require('../lib/store')
 
-    // Hide player controls while playing video, if the mouse stays still for a while
-    // Never hide the controls when:
-    // * The mouse is over the controls or we're scrubbing (see CSS)
-    // * The video is paused
-    // * The video is playing remotely on Chromecast or Airplay
-    const hideControls = state.shouldHidePlayerControls()
-
-    const cls = [
-      'view-' + state.location.url(), /* e.g. view-home, view-player */
-      'is-' + process.platform /* e.g. is-darwin, is-win32, is-linux */
-    ]
-    if (state.window.isFullScreen) cls.push('is-fullscreen')
-    if (state.window.isFocused) cls.push('is-focused')
-    if (hideControls) cls.push('hide-video-controls')
-
-    return (
-      <div className={'app ' + cls.join(' ')}>
-        <Header state={state} />
-        {this.getErrorPopover()}
-        <div key='content' className='content'>{this.getView()}</div>
-        {this.getModal()}
-      </div>
-    )
-  }
-
-  getErrorPopover () {
-    const state = this.props.state
-    const now = new Date().getTime()
-    const recentErrors = state.errors.filter((x) => now - x.time < 5000)
-    const hasErrors = recentErrors.length > 0
-
-    const errorElems = recentErrors.map((error, i) => <div key={i} className='error'>{error.message}</div>)
-    return (
-      <div
-        key='errors'
-        className={'error-popover ' + (hasErrors ? 'visible' : 'hidden')}
-      >
-        <div key='title' className='title'>Error</div>
-        {errorElems}
-      </div>
-    )
-  }
-
-  getModal () {
-    const state = this.props.state
-    if (!state.modal) return
-
-    const ModalContents = Modals[state.modal.id]()
-    return (
-      <div key='modal' className='modal'>
-        <div key='modal-background' className='modal-background' />
-        <div key='modal-content' className='modal-content' role='dialog' aria-modal='true' aria-label='WebTorrent dialog'>
-          <ModalContents state={state} />
-        </div>
-      </div>
-    )
-  }
-
-  getView () {
-    const state = this.props.state
-    const View = Views[state.location.url()]()
-    return (<View state={state} />)
-  }
+function useScope (store, keys) {
+  const scope = keys.join('|')
+  const subscribe = React.useCallback(listener => store.subscribe(keys, listener), [store, scope])
+  const snapshot = React.useCallback(() => store.version(keys), [store, scope])
+  React.useSyncExternalStore(subscribe, snapshot)
+  return store.state
 }
+
+function App (props) {
+  const fallback = React.useMemo(() => props.store || createStore(props.state), [props.store, props.state])
+  const state = useScope(fallback, ['location', 'window', 'playing.hideControls'])
+  const classes = ['view-' + state.location.url(), 'is-' + process.platform]
+  if (state.window.isFullScreen) classes.push('is-fullscreen')
+  if (state.window.isFocused) classes.push('is-focused')
+  if (state.playing.hideControls) classes.push('hide-video-controls')
+  return (
+    <div className={'app ' + classes.join(' ')}>
+      <StoreHeader store={fallback} />
+      <Errors store={fallback} />
+      <div key='content' className='content'><View store={fallback} /></div>
+      <Modal store={fallback} />
+    </div>
+  )
+}
+
+const StoreHeader = React.memo(function StoreHeader ({ store }) {
+  const state = useScope(store, ['location', 'window', 'playing.fileName'])
+  return <Header state={state} />
+})
+
+const View = React.memo(function View ({ store }) {
+  const state = useScope(store, ['location'])
+  const page = state.location.url()
+  return <Page key={page} store={store} page={page} />
+})
+
+function Page ({ store, page }) {
+  const keys = page === 'preferences'
+    ? ['saved.prefs']
+    : page === 'create-torrent'
+      ? ['location']
+      : page === 'player'
+        ? ['playing', 'saved.torrents', 'server', 'devices', 'window']
+        : ['saved.torrents', 'saved.prefs', 'selectedInfoHash', 'downloadPathStatus']
+  const state = useScope(store, keys)
+  const Contents = Views[page]()
+  return <Contents state={state} />
+}
+
+const Modal = React.memo(function Modal ({ store }) {
+  const state = useScope(store, ['modal', 'saved.torrents'])
+  if (!state.modal) return null
+  const Contents = Modals[state.modal.id]()
+  return (
+    <div key='modal' className='modal'>
+      <div key='modal-background' className='modal-background' />
+      <div key='modal-content' className='modal-content' role='dialog' aria-modal='true' aria-label='WebTorrent dialog'>
+        <Contents state={state} />
+      </div>
+    </div>
+  )
+})
+
+const Errors = React.memo(function Errors ({ store }) {
+  const state = useScope(store, ['errors'])
+  const [, expire] = React.useState(0)
+  const recent = state.errors.filter(error => Date.now() - error.time < 5000)
+  React.useEffect(() => {
+    if (!recent.length) return
+    const timeout = setTimeout(() => expire(value => value + 1), Math.max(1, Math.min(...recent.map(error => error.time + 5000 - Date.now()))))
+    return () => clearTimeout(timeout)
+  })
+  return (
+    <div key='errors' className={'error-popover ' + (recent.length ? 'visible' : 'hidden')}>
+      <div key='title' className='title'>Error</div>
+      {recent.map((error, index) => <div key={index} className='error'>{error.message}</div>)}
+    </div>
+  )
+})
 
 module.exports = App

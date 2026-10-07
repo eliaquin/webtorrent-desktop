@@ -1,6 +1,6 @@
 const { TextField } = require('./ui')
 const React = require('react')
-const { clipboard } = require('@electron/remote')
+const { clipboard } = require('../lib/native-api')
 
 const ModalOKCancel = require('./modal-ok-cancel')
 const { dispatch, dispatcher } = require('../lib/dispatcher')

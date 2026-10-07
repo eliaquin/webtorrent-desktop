@@ -3,7 +3,8 @@ module.exports = {
   getNextIndex,
   hasPrevious,
   getPreviousIndex,
-  getCurrentLocalURL
+  getCurrentLocalURL,
+  getCurrentNetworkURL
 }
 
 const TorrentSummary = require('./torrent-summary')
@@ -37,9 +38,17 @@ function getPreviousIndex (state) {
 }
 
 function getCurrentLocalURL (state) {
-  return state.server
-    ? state.server.localURL + '/' + state.playing.fileIndex + '/' +
-      encodeURIComponent(state.playing.fileName)
+  return getCurrentURL(state, 'localURL')
+}
+
+function getCurrentNetworkURL (state) {
+  return getCurrentURL(state, 'networkURL')
+}
+
+function getCurrentURL (state, key) {
+  const file = state.getPlayingFileSummary()
+  return state.server && file
+    ? state.server[key] + '/' + file.path.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
     : ''
 }
 

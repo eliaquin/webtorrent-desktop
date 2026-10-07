@@ -7,7 +7,6 @@ const prettyBytes = require('prettier-bytes')
 const TorrentSummary = require('../lib/torrent-summary')
 const Playlist = require('../lib/playlist')
 const { dispatch, dispatcher } = require('../lib/dispatcher')
-const config = require('../../config')
 const { calculateEta } = require('../lib/time')
 
 // Shows a streaming video player. Standard features + Chromecast + Airplay
@@ -30,7 +29,11 @@ module.exports = class Player extends React.Component {
     )
   }
 
-  onComponentWillUnmount () {
+  componentDidMount () { syncMedia(this.props.state) }
+
+  componentDidUpdate () { syncMedia(this.props.state) }
+
+  componentWillUnmount () {
     // Unload the media element so that Chromium stops trying to fetch data
     const tag = document.querySelector('audio,video')
     if (!tag) return
@@ -46,9 +49,8 @@ function handleVolumeWheel (e) {
   dispatch('changeVolume', (-e.deltaY | e.deltaX) / 500)
 }
 
-function renderMedia (state) {
+function syncMedia (state) {
   if (!state.server) return
-
   // Unfortunately, play/pause can't be done just by modifying HTML.
   // Instead, grab the DOM node and play/pause it if necessary
   // Get the <video> or <audio> tag
@@ -79,7 +81,7 @@ function renderMedia (state) {
     if (state.playing.isPaused && !mediaElement.paused) {
       mediaElement.pause()
     } else if (!state.playing.isPaused && mediaElement.paused) {
-      mediaElement.play()
+      mediaElement.play().catch(err => { if (err.name !== 'AbortError') dispatch('mediaError', err.message) })
     }
     // When the user clicks or drags on the progress bar, jump to that position
     if (state.playing.jumpToTime != null) {
@@ -108,18 +110,18 @@ function renderMedia (state) {
       tracks[j].mode = isSelectedTrack ? 'showing' : 'hidden'
     }
 
-    // Save video position
     const file = state.getPlayingFileSummary()
-    file.currentTime = state.playing.currentTime = mediaElement.currentTime
-    file.duration = state.playing.duration = mediaElement.duration
+    if (!file) return
 
     // Save selected subtitle
     if (state.playing.subtitles.selectedIndex !== -1) {
       const index = state.playing.subtitles.selectedIndex
       const track = state.playing.subtitles.tracks[index]
-      file.selectedSubtitle = track.embedded
-        ? { filePath: track.filePath, streamIndex: track.streamIndex }
-        : track.filePath
+      if (track.embedded) {
+        if (file.selectedSubtitle?.filePath !== track.filePath || file.selectedSubtitle?.streamIndex !== track.streamIndex) {
+          file.selectedSubtitle = { filePath: track.filePath, streamIndex: track.streamIndex }
+        }
+      } else file.selectedSubtitle = track.filePath
     } else if (file.selectedSubtitle != null) {
       delete file.selectedSubtitle
     }
@@ -130,9 +132,11 @@ function renderMedia (state) {
       const isSelectedTrack = j === state.playing.audioTracks.selectedIndex
       audioTracks[j].enabled = isSelectedTrack
     }
-
-    state.playing.volume = mediaElement.volume
   }
+}
+
+function renderMedia (state) {
+  if (!state.server) return
 
   // Add subtitles to the <video> tag
   const trackTags = []
@@ -162,7 +166,8 @@ function renderMedia (state) {
       onEnded={onEnded}
       onStalled={dispatcher('mediaStalled')}
       onError={dispatcher('mediaError')}
-      onTimeUpdate={dispatcher('mediaTimeUpdate')}
+      onTimeUpdate={e => dispatch('mediaTimeUpdate', { currentTime: e.target.currentTime, duration: e.target.duration })}
+      onVolumeChange={e => dispatch('mediaVolumeChanged', e.target.volume)}
       onEncrypted={dispatcher('mediaEncrypted')}
     >
       {trackTags}
@@ -183,15 +188,12 @@ function renderMedia (state) {
 
   function onLoadedMetadata (e) {
     const mediaElement = e.target
+    dispatch('mediaTimeUpdate', { currentTime: mediaElement.currentTime, duration: mediaElement.duration })
 
     // check if we can decode video and audio track
     if (state.playing.type === 'video') {
       if (mediaElement.videoTracks.length === 0) {
         dispatch('mediaError', 'Video codec unsupported')
-      }
-
-      if (mediaElement.audioTracks.length === 0) {
-        dispatch('mediaError', 'Audio codec unsupported')
       }
 
       dispatch('mediaSuccess')
@@ -219,10 +221,6 @@ function renderMedia (state) {
 
     // check if we can decode audio track
     if (state.playing.type === 'audio') {
-      if (mediaElement.audioTracks.length === 0) {
-        dispatch('mediaError', 'Audio codec unsupported')
-      }
-
       dispatch('mediaSuccess')
     }
   }
@@ -931,8 +929,6 @@ function renderPreview (state) {
 // Renders the loading bar. Shows which parts of the torrent are loaded, which
 // can be 'spongey' / non-contiguous
 function renderLoadingBar (state) {
-  if (config.IS_TEST) return // Don't integration test the loading bar. Screenshots won't match.
-
   const torrentSummary = state.getPlayingTorrentSummary()
   if (!torrentSummary.progress) {
     return null

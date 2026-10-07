@@ -33,7 +33,17 @@ module.exports = class MediaController {
     }
   }
 
-  mediaTimeUpdate () {
+  mediaVolumeChanged (volume) {
+    this.state.playing.volume = volume
+  }
+
+  mediaTimeUpdate (data) {
+    if (data) {
+      const file = this.state.getPlayingFileSummary()
+      if (Number.isFinite(data.currentTime)) this.state.playing.currentTime = data.currentTime
+      if (Number.isFinite(data.duration)) this.state.playing.duration = data.duration
+      if (file) { file.currentTime = this.state.playing.currentTime; file.duration = this.state.playing.duration }
+    }
     this.state.playing.lastTimeUpdate = new Date().getTime()
     this.state.playing.isStalled = false
   }

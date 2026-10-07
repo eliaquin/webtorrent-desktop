@@ -1,0 +1,167 @@
+module.exports = torrentPoster
+
+const { execFile } = require('child_process')
+const { promisify } = require('util')
+const { findTool } = require('./embedded-subtitles')
+const secureMediaServer = require('./secure-media-server')
+const run = promisify(execFile)
+const path = require('path')
+
+const mediaExtensions = require('../shared/media-extensions')
+
+const msgNoSuitablePoster = 'Cannot generate a poster from any files in the torrent'
+
+function torrentPoster (torrent, cb) {
+  // First, try to use a poster image if available
+  const posterFile = torrent.files.filter(file => /^poster\.(jpg|png|gif)$/.test(file.name))[0]
+  if (posterFile) return extractPoster(posterFile, cb)
+
+  // 'score' each media type based on total size present in torrent
+  const bestScore = ['audio', 'video', 'image'].map(mediaType => ({
+    type: mediaType,
+    size: calculateDataLengthByExtension(torrent, mediaExtensions[mediaType])
+  })).sort((a, b) => b.size - a.size)[0] // sort descending on size
+
+  if (bestScore.size === 0) {
+    // Admit defeat, no video, audio or image had a significant presence
+    return cb(new Error(msgNoSuitablePoster))
+  }
+
+  // Based on which media type is dominant we select the corresponding poster function
+  switch (bestScore.type) {
+    case 'audio':
+      return torrentPosterFromAudio(torrent, cb)
+    case 'image':
+      return torrentPosterFromImage(torrent, cb)
+    case 'video':
+      return torrentPosterFromVideo(torrent, cb)
+  }
+}
+
+/**
+ * Calculate the total data size of file matching one of the provided extensions
+ * @param torrent
+ * @param extensions List of extension to match
+ * @returns {number} total size, of matches found (>= 0)
+ */
+function calculateDataLengthByExtension (torrent, extensions) {
+  const files = filterOnExtension(torrent, extensions)
+  if (files.length === 0) return 0
+  return files
+    .map(file => file.length)
+    .reduce((a, b) => a + b)
+}
+
+/**
+ * Get the largest file of a given torrent, filtered by provided extension
+ * @param torrent Torrent to search in
+ * @param extensions Extension whitelist filter
+ * @returns Torrent file object
+ */
+function getLargestFileByExtension (torrent, extensions) {
+  const files = filterOnExtension(torrent, extensions)
+  if (files.length === 0) return undefined
+  return files.reduce((a, b) => a.length > b.length ? a : b)
+}
+
+/**
+ * Filter file on a list extension, can be used to find al image files
+ * @param torrent Torrent to filter files from
+ * @param extensions File extensions to filter on
+ * @returns {Array} Array of torrent file objects matching one of the given extensions
+ */
+function filterOnExtension (torrent, extensions) {
+  return torrent.files.filter(file => {
+    const extname = path.extname(file.name).toLowerCase()
+    return extensions.indexOf(extname) !== -1
+  })
+}
+
+/**
+ * Returns a score how likely the file is suitable as a poster
+ * @param imgFile File object of an image
+ * @returns {number} Score, higher score is a better match
+ */
+function scoreAudioCoverFile (imgFile) {
+  const fileName = path.basename(imgFile.name, path.extname(imgFile.name)).toLowerCase()
+  const relevanceScore = {
+    cover: 80,
+    folder: 80,
+    album: 80,
+    front: 80,
+    back: 20,
+    spectrogram: -80
+  }
+
+  for (const keyword in relevanceScore) {
+    if (fileName === keyword) {
+      return relevanceScore[keyword]
+    }
+    if (fileName.indexOf(keyword) !== -1) {
+      return relevanceScore[keyword]
+    }
+  }
+  return 0
+}
+
+function torrentPosterFromAudio (torrent, cb) {
+  const imageFiles = filterOnExtension(torrent, mediaExtensions.image)
+
+  if (imageFiles.length === 0) return cb(new Error(msgNoSuitablePoster))
+
+  const bestCover = imageFiles.map(file => ({
+    file,
+    score: scoreAudioCoverFile(file)
+  })).reduce((a, b) => {
+    if (a.score > b.score) {
+      return a
+    }
+    if (b.score > a.score) {
+      return b
+    }
+    // If score is equal, pick the largest file, aiming for highest resolution
+    if (a.file.length > b.file.length) {
+      return a
+    }
+    return b
+  })
+
+  const extname = path.extname(bestCover.file.name)
+  bestCover.file.arrayBuffer().then(data => cb(null, Buffer.from(data), extname), cb)
+}
+
+async function torrentPosterFromVideo (torrent, cb) {
+  let server
+  try {
+    const ffmpeg = findTool('ffmpeg')
+    const { NodeServer } = await import('webtorrent/lib/server.js')
+    const file = getLargestFileByExtension(torrent, mediaExtensions.video)
+    server = new NodeServer(torrent.client)
+    const listening = new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    const prefix = secureMediaServer(server.server, '127.0.0.1')
+    await listening
+    const filePath = file.path.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
+    const url = 'http://127.0.0.1:' + server.address().port + prefix + '/webtorrent/' + torrent.infoHash + '/' + filePath
+    const { stdout } = await run(ffmpeg, [
+      '-nostdin', '-v', 'error', '-protocol_whitelist', 'http,tcp,pipe',
+      '-i', url, '-ss', '1', '-frames:v', '1', '-vf', 'scale=640:-1',
+      '-f', 'image2pipe', '-c:v', 'mjpeg', 'pipe:1'
+    ], { encoding: 'buffer', timeout: 30000, maxBuffer: 8 * 1024 * 1024, windowsHide: true })
+    if (!stdout.length) throw new Error(msgNoSuitablePoster)
+    cb(null, stdout, '.jpg')
+  } catch (err) {
+    cb(err)
+  } finally {
+    if (server) await new Promise(resolve => server.destroy(resolve))
+  }
+}
+
+function torrentPosterFromImage (torrent, cb) {
+  const file = getLargestFileByExtension(torrent, mediaExtensions.image)
+  extractPoster(file, cb)
+}
+
+function extractPoster (file, cb) {
+  const extname = path.extname(file.name)
+  file.arrayBuffer().then(data => cb(null, Buffer.from(data), extname), cb)
+}

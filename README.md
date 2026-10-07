@@ -13,40 +13,23 @@
 
 <p align="center">
   <a href="https://discord.gg/cnXkm4Z"><img src="https://img.shields.io/discord/612575111718895616" alt="discord"></a>
-  <a href="https://github.com/webtorrent/webtorrent-desktop/actions/workflows/ci.yml"><img src="https://github.com/webtorrent/webtorrent-desktop/actions/workflows/ci.yml/badge.svg" alt="GitHub CI action"></a>
-  <a href="https://github.com/webtorrent/webtorrent-desktop/releases"><img src="https://img.shields.io/github/release/webtorrent/webtorrent-desktop.svg" alt="github release version"></a>
-  <a href="https://github.com/webtorrent/webtorrent-desktop/releases"><img src="https://img.shields.io/github/downloads/webtorrent/webtorrent-desktop/total.svg" alt="github release downloads"></a>
+  <a href="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml"><img src="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml/badge.svg" alt="GitHub CI action"></a>
+  <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/release/eliaquin/webtorrent-desktop.svg" alt="github release version"></a>
+  <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/downloads/eliaquin/webtorrent-desktop/total.svg" alt="github release downloads"></a>
   <a href="https://standardjs.com"><img src="https://img.shields.io/badge/code_style-standard-brightgreen.svg" alt="Standard - JavaScript Style Guide"></a>
 </p>
 
+This is Eliaquin's personal fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
+with React 19, Electron 44 and WebTorrent 3. Original authorship and license are preserved.
+
 ## Install
 
-### Recommended Install
+Download this fork's builds from [its GitHub releases](https://github.com/eliaquin/webtorrent-desktop/releases)
+when a release is available, or build locally using the instructions below.
+Homebrew's `webtorrent` cask installs the upstream project, not this personal fork.
 
-Download the latest version of WebTorrent Desktop from
-[the official website](https://webtorrent.io/desktop/):
-
-### [✨ Download WebTorrent Desktop ✨](https://webtorrent.io/desktop/)
-
-### Advanced Install
-
-- Download specific installer files from the [GitHub releases](https://github.com/webtorrent/webtorrent-desktop/releases) page.
-
-- Use [Homebrew-Cask](https://github.com/caskroom/homebrew-cask) to install from the command line:
-
-  ```
-  $ brew install --cask webtorrent
-  ```
-
-- Try the (unstable) development version by cloning the Git repository. See the
-  ["How to Contribute"](#how-to-contribute) instructions.
-
-## Screenshots
-
-<p align="center">
-  <img src="https://webtorrent.io/img/screenshot-player3.png" alt="screenshot" align="center">
-  <img src="https://webtorrent.io/img/screenshot-main.png" width="612" height="749" alt="screenshot" align="center">
-</p>
+Embedded subtitle extraction and video posters use system FFmpeg. On macOS,
+install it with `brew install ffmpeg`.
 
 ## How to Contribute
 
@@ -55,9 +38,9 @@ Download the latest version of WebTorrent Desktop from
 Use Node.js 24 LTS (or Node.js 22.12+). Node.js 16 and 18 are no longer supported.
 
 ```
-$ git clone https://github.com/webtorrent/webtorrent-desktop.git
+$ git clone https://github.com/eliaquin/webtorrent-desktop.git
 $ cd webtorrent-desktop
-$ npm install
+$ npm ci
 ```
 
 ### Run the app
@@ -95,53 +78,51 @@ critical) to zero known advisories on October 7, 2026. This includes development
 and optional dependencies. npm advisories do not cover every possible bug or
 external tools such as the system FFmpeg installation.
 
-The application now runs Node APIs in isolated preloads, blocks page scripts,
-navigation and popups, validates IPC senders, and protects media/caption servers
-with random access tokens and Host/Origin checks. Preloads still require
-`sandbox: false`; migrating their filesystem/network work to utility processes
-would further reduce the impact of a future Chromium or preload compromise.
+The React UI runs in sandboxed, isolated windows. A small preload exposes
+allowlisted application commands, requests and events. Filesystem operations and
+native dialogs run in the main process; torrent networking, casting discovery,
+subtitle extraction and posters run in a utility process. IPC sender/frame checks
+and token-protected media endpoints remain in place.
 
-Legacy network packages use `vendor/ip-compat`, a small replacement for their IP
-APIs built on `ipaddr.js`, rather than the unpatched `ip` dependency. Explicit
-XML, protobuf, Browserslist and temporary-file overrides keep transitive packages
-on patched versions; security regression tests cover the required legacy APIs.
+Legacy casting packages use `vendor/ip-compat` backed by `ipaddr.js`. Torrent
+blocklists use `vendor/ip-set-compat` backed by Node's IPv4/IPv6 `BlockList`; this
+also avoids the upstream package's pnpm-only install script. Parser overrides
+keep legacy casting dependencies on patched XML/protobuf versions. Tests cover
+these compatibility APIs. See [SECURITY-AUDIT.md](SECURITY-AUDIT.md).
 
-### Run integration tests
+### Run all checks
 
-Run the React UI interaction checks in Electron, without WebDriver:
-
-```
-$ npm run test-ui
-```
-
-These checks cover preferences, torrent creation, download toggling, modal keyboard
-behavior, and native controls. They do not connect to torrent networks.
-
-Run the existing screenshot integration suite:
-
-```
-$ npm run test-integration
+```sh
+npm run test-all
 ```
 
-The integration tests use Playwright and Tape. They click through the app, taking screenshots and
-comparing each one to a reference. Why screenshots?
+Tests cover store subscriptions, local TCP peers and verified resume, security,
+React component interactions, subtitle conversion/races, and the full packaged
+app flow through Playwright. Integration tests create local media and temporary
+profiles; they do not depend on public torrents or screen-specific golden images.
+Linux CI uses Xvfb. `WEBTORRENT_PACKAGED_APP` can target a packaged executable for
+security and integration checks.
 
-* Ad-hoc checking makes the tests a lot more work to write
-* Even diffing the whole HTML is not as thorough as screenshot diffing. For example, it wouldn't
-  catch an bug where hitting ESC from a video doesn't correctly restore window size.
-* Chrome's own integration tests use screenshot diffing iirc
-* Small UI changes will break a few tests, but the fix is as easy as deleting the offending
-  screenshots and running the tests, which will recreate them with the new look.
-* The resulting Github PR will then show, pixel by pixel, the exact UI changes that were made! See
-  https://github.com/blog/817-behold-image-view-modes
+### Architecture
 
-For MacOS, you'll need a Retina screen for the integration tests to pass. Your screen should have
-the same resolution as a 2018 MacBook Pro 13".
+- `src/main/`: native windows, IPC, OS integration and atomic profile persistence.
+- `src/engine/`: utility-process torrent, casting and media processing services.
+- `src/renderer/`: browser-only React UI and scoped state subscriptions.
+- `src/shared/`: state model, shared helpers and IPC channel declarations.
+- `bin/build.js`: esbuild compilation, UI bundling and sandboxed preload bundles.
 
-For Windows, you'll need Windows 10 with a 1366x768 screen.
+UI state belongs to a private store. Components subscribe to the branches they
+use; download progress does not rerender the preferences page. Media DOM updates
+run after React commits, with playback events driving progress and volume.
 
-When running integration tests, keep the mouse on the edge of the screen and don't touch the mouse
-or keyboard while the tests are running.
+Usage diagnostics remain local and bounded in memory; crash uploads are disabled.
+Update checks use this fork's GitHub releases and require manual installation.
+
+### Cleanup
+
+`npm run clean` removes only generated build files. Downloads, saved settings and
+build backups are preserved. An intentional profile reset requires quitting the
+app and running `npm run reset-app -- --confirm-profile-reset`.
 
 ### Package the app
 

@@ -9,7 +9,7 @@ module.exports = {
 
 const path = require('path')
 
-const mediaExtensions = require('./media-extensions')
+const mediaExtensions = require('../../shared/media-extensions')
 
 // Checks whether a fileSummary or file path is audio/video that we can play,
 // based on the file extension

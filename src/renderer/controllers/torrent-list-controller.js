@@ -1,11 +1,9 @@
-const fs = require('fs')
 const path = require('path')
 const { ipcRenderer } = require('electron')
-const { clipboard } = require('@electron/remote')
-const remote = require('@electron/remote')
+const native = require('../lib/native-api')
 
 const { dispatch } = require('../lib/dispatcher')
-const { TorrentKeyNotFoundError } = require('../lib/errors')
+const { TorrentKeyNotFoundError } = require('../../shared/errors')
 const sound = require('../lib/sound')
 const TorrentSummary = require('../lib/torrent-summary')
 
@@ -95,13 +93,9 @@ module.exports = class TorrentListController {
     if (!fileOrFolder) return start()
 
     // Existing torrent: check that the path is still there
-    fs.stat(fileOrFolder, err => {
-      if (err) {
-        s.error = 'path-missing'
-        dispatch('backToList')
-        return
-      }
-      start()
+    native.statPath(fileOrFolder).then(start, () => {
+      s.error = 'path-missing'
+      dispatch('backToList')
     })
 
     function start () {
@@ -256,69 +250,23 @@ module.exports = class TorrentListController {
 
   openTorrentContextMenu (infoHash) {
     const torrentSummary = TorrentSummary.getByKey(this.state, infoHash)
-    const menu = new remote.Menu()
-
-    menu.append(new remote.MenuItem({
-      label: 'Remove From List',
-      click: () => dispatch('confirmDeleteTorrent', torrentSummary.infoHash, false)
-    }))
-
-    menu.append(new remote.MenuItem({
-      label: 'Remove Data File',
-      click: () => dispatch('confirmDeleteTorrent', torrentSummary.infoHash, true)
-    }))
-
-    menu.append(new remote.MenuItem({
-      type: 'separator'
-    }))
-
-    if (torrentSummary.files) {
-      menu.append(new remote.MenuItem({
-        label: process.platform === 'darwin' ? 'Show in Finder' : 'Show in Folder',
-        click: () => showItemInFolder(torrentSummary)
-      }))
-      menu.append(new remote.MenuItem({
-        type: 'separator'
-      }))
-    }
-
-    menu.append(new remote.MenuItem({
-      label: 'Copy Magnet Link to Clipboard',
-      click: () => clipboard.writeText(torrentSummary.magnetURI)
-    }))
-
-    menu.append(new remote.MenuItem({
-      label: 'Copy Instant.io Link to Clipboard',
-      click: () => clipboard.writeText(`https://instant.io/#${torrentSummary.infoHash}`)
-    }))
-
-    menu.append(new remote.MenuItem({
-      label: 'Save Torrent File As...',
-      click: () => dispatch('saveTorrentFileAs', torrentSummary.torrentKey),
-      enabled: torrentSummary.torrentFileName != null
-    }))
-
-    menu.append(new remote.MenuItem({
-      type: 'separator'
-    }))
-
-    const sortedByName = this.state.saved.prefs.sortByName
-    menu.append(new remote.MenuItem({
-      label: `${sortedByName ? '✓ ' : ''}Sort by Name`,
-      click: () => dispatch('updatePreferences', 'sortByName', !sortedByName)
-    }))
-
-    menu.popup({ window: remote.getCurrentWindow() })
+    native.showTorrentMenu({
+      infoHash: torrentSummary.infoHash,
+      torrentKey: torrentSummary.torrentKey,
+      magnetURI: torrentSummary.magnetURI,
+      torrentFileName: torrentSummary.torrentFileName,
+      dataPath: TorrentSummary.getFileOrFolder(torrentSummary),
+      sortByName: this.state.saved.prefs.sortByName
+    })
   }
 
   // Takes a torrentSummary or torrentKey
   // Shows a Save File dialog, then saves the .torrent file wherever the user requests
-  saveTorrentFileAs (torrentKey) {
+  async saveTorrentFileAs (torrentKey) {
     const torrentSummary = TorrentSummary.getByKey(this.state, torrentKey)
     if (!torrentSummary) throw new TorrentKeyNotFoundError(torrentKey)
     const downloadPath = this.state.saved.prefs.downloadPath
     const newFileName = path.parse(torrentSummary.name).name + '.torrent'
-    const win = remote.getCurrentWindow()
     const opts = {
       title: 'Save Torrent File',
       defaultPath: path.join(downloadPath, newFileName),
@@ -329,67 +277,18 @@ module.exports = class TorrentListController {
       buttonLabel: 'Save'
     }
 
-    const savePath = remote.dialog.showSaveDialogSync(win, opts)
-
-    if (!savePath) return // They clicked Cancel
-    console.log('Saving torrent ' + torrentKey + ' to ' + savePath)
-    const torrentPath = TorrentSummary.getTorrentPath(torrentSummary)
-    fs.readFile(torrentPath, (err, torrentFile) => {
-      if (err) return dispatch('error', err)
-      fs.writeFile(savePath, torrentFile, err => {
-        if (err) return dispatch('error', err)
-      })
-    })
+    try {
+      await native.saveTorrentAs(torrentSummary.torrentFileName, opts)
+    } catch (err) {
+      dispatch('error', err)
+    }
   }
 }
 
 // Recursively finds {name, path, size} for all files in a folder
 // Calls `cb` on success, calls `onError` on failure
-function findFilesRecursive (paths, cb_) {
-  if (paths.length > 1) {
-    let numComplete = 0
-    const ret = []
-    paths.forEach(path => {
-      findFilesRecursive([path], fileObjs => {
-        ret.push(...fileObjs)
-        if (++numComplete === paths.length) {
-          ret.sort((a, b) => a.path < b.path ? -1 : Number(a.path > b.path))
-          cb_(ret)
-        }
-      })
-    })
-    return
-  }
-
-  const fileOrFolder = paths[0]
-  fs.stat(fileOrFolder, (err, stat) => {
-    if (err) return dispatch('error', err)
-
-    // Files: return name, path, and size
-    if (!stat.isDirectory()) {
-      const filePath = fileOrFolder
-      return cb_([{
-        name: path.basename(filePath),
-        path: filePath,
-        size: stat.size
-      }])
-    }
-
-    // Folders: recurse, make a list of all the files
-    const folderPath = fileOrFolder
-    fs.readdir(folderPath, (err, fileNames) => {
-      if (err) return dispatch('error', err)
-      const paths = fileNames.map((fileName) => path.join(folderPath, fileName))
-      findFilesRecursive(paths, cb_)
-    })
-  })
-}
-
-function deleteFile (path) {
-  if (!path) return
-  fs.unlink(path, err => {
-    if (err) dispatch('error', err)
-  })
+function findFilesRecursive (paths, complete) {
+  native.filesForSeeding(paths).then(complete, err => dispatch('error', err))
 }
 
 // Delete all files in a torrent
@@ -398,16 +297,11 @@ function moveItemToTrash (torrentSummary) {
   if (filePath) ipcRenderer.send('moveItemToTrash', filePath)
 }
 
-function showItemInFolder (torrentSummary) {
-  ipcRenderer.send('showItemInFolder', TorrentSummary.getFileOrFolder(torrentSummary))
-}
-
 function deleteTorrentFile (torrentSummary, deleteData) {
   ipcRenderer.send('wt-stop-torrenting', torrentSummary.infoHash)
 
   // remove torrent and poster file
-  deleteFile(TorrentSummary.getTorrentPath(torrentSummary))
-  deleteFile(TorrentSummary.getPosterPath(torrentSummary))
+  native.removeTorrentCache(torrentSummary.torrentFileName, torrentSummary.posterFileName).catch(err => dispatch('error', err))
 
   // optionally delete the torrent data
   if (deleteData) moveItemToTrash(torrentSummary)
