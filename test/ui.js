@@ -182,7 +182,34 @@ async function runUI (projectRoot) {
   }
 
   state.modal = null
+  state.location.url = () => 'player'
+  const torrent = state.saved.torrents[0]
+  torrent.files = [{ name: 'example.mp4', path: 'example.mp4' }]
+  torrent.progress.files = []
+  state.getPlayingTorrentSummary = () => torrent
+  state.getPlayingFileSummary = () => torrent.files[0]
+  state.devices = {}
+  state.playing = require(projectRoot + '/build/renderer/lib/state').getDefaultPlayState()
+  Object.assign(state.playing, { type: 'video', infoHash: torrent.infoHash, fileIndex: 0, fileName: 'example.mp4' })
+  state.playing.subtitles.tracks = [{ label: 'English' }, { label: 'English (Forced)' }]
+  state.playing.subtitles.selectedIndex = 0
+  await render(h(App, { state }))
+  assert.strictEqual(document.querySelector('.subtitle-track-label').textContent, 'English', 'selected subtitle appears next to CC')
+  state.playing.subtitles.selectedIndex = 1
+  await render(h(App, { state }))
+  const captions = document.querySelector('.subtitle-control')
+  assert.strictEqual(captions.querySelector('.subtitle-track-label').textContent, 'English (Forced)')
+  assert.strictEqual(captions.title, 'Subtitles: English (Forced)', 'hover exposes the complete label')
+  events.length = 0
+  await click(captions)
+  assert.deepStrictEqual(events.pop(), ['toggleSubtitlesMenu'], 'the caption label opens the subtitle menu')
+  state.playing.subtitles.selectedIndex = -1
+  await render(h(App, { state }))
+  assert.strictEqual(document.querySelector('.subtitle-track-label'), null, 'Off clears the subtitle label')
+  state.playing.subtitles.tracks = []
+  await render(h(App, { state }))
+  assert.strictEqual(document.querySelector('.subtitle-control').getAttribute('aria-label'), 'Closed captions')
   state.location.url = () => 'preferences'
   await render(h(App, { state }))
-  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modal focus/paste/Enter/cancel, React root updates'
+  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modal focus/paste/Enter/cancel, React root updates, selected subtitle label'
 }

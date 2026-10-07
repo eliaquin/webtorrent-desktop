@@ -635,6 +635,32 @@ body.drag .app::after {
   margin-top: 6px;
 }
 
+.player .controls .subtitle-control {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.player .controls .subtitle-control:focus-visible {
+  outline: 2px solid #b1b8f3;
+  outline-offset: -2px;
+}
+
+.player .controls .subtitle-track-label {
+  max-width: min(120px, 14vw);
+  margin-right: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #b1b8f3;
+}
+
 .player .controls .icon.multi-audio {
   font-size: 26px;
   margin-top: 6px;

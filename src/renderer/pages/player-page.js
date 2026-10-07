@@ -606,6 +606,7 @@ function renderPlayerControls (state) {
     : state.playing.subtitles.selectedIndex >= 0
       ? 'active'
       : ''
+  const selectedSubtitle = state.playing.subtitles.tracks[state.playing.subtitles.selectedIndex]
   const multiAudioClass = state.playing.audioTracks.tracks.length > 1
     ? 'active'
     : 'disabled'
@@ -678,15 +679,18 @@ function renderPlayerControls (state) {
   if (state.playing.type === 'video') {
     // Show closed captions icon
     elements.push((
-      <i
+      <button
         key='subtitles'
-        className={'icon closed-caption float-right ' + captionsClass}
+        type='button'
+        className={'subtitle-control control float-right ' + captionsClass}
         onClick={handleSubtitles}
-        role='button'
-        aria-label='Closed captions'
+        title={selectedSubtitle ? `Subtitles: ${selectedSubtitle.label}` : 'Closed captions'}
+        aria-label={selectedSubtitle ? `Closed captions: ${selectedSubtitle.label}` : 'Closed captions'}
+        aria-expanded={state.playing.subtitles.showMenu}
       >
-        closed_caption
-      </i>
+        <i className={'icon closed-caption ' + captionsClass} aria-hidden='true'>closed_caption</i>
+        {selectedSubtitle && <span className='subtitle-track-label'>{selectedSubtitle.label}</span>}
+      </button>
     ), (
       <i
         key='audio-tracks'
