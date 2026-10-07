@@ -202,6 +202,7 @@ function lazyLoadCast () {
 // 4. controller - the controller handles the event, changing the state object
 function update () {
   controllers.playback().showOrHidePlayerControls()
+  controllers.subtitles().checkForEmbeddedSubtitles()
   root.render(<App state={state} />)
   updateElectron()
 }
