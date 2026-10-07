@@ -1,17 +1,3 @@
-/**
- * Perf optimization: Hook into require() to modify how certain modules load:
- *
- * - `inline-style-prefixer` (used by `material-ui`) takes ~40ms. It is not
- *   actually used because auto-prefixing is disabled with
- *   `darkBaseTheme.userAgent = false`. Return a fake object.
- */
-const Module = require('module')
-const _require = Module.prototype.require
-Module.prototype.require = function (id) {
-  if (id === 'inline-style-prefixer') return {}
-  return _require.apply(this, arguments)
-}
-
 console.time('init')
 
 // Perf optimization: Start asynchronously read on config file before all the
@@ -26,7 +12,8 @@ const dragDrop = require('drag-drop')
 const electron = require('electron')
 const fs = require('fs')
 const React = require('react')
-const ReactDOM = require('react-dom')
+const { createRoot } = require('react-dom/client')
+const remote = require('@electron/remote')
 
 const config = require('../config')
 const telemetry = require('./lib/telemetry')
@@ -57,8 +44,8 @@ let Cast = null
 // All other state is ephemeral. First we load state.saved then initialize the app.
 let state
 
-// Root React component
-let app
+// React root, shared by the initial render and subsequent state updates
+let root
 
 // Called once when the application loads. (Not once per window.)
 // Connects to the torrent networks, sets up the UI and OS integrations like
@@ -130,11 +117,9 @@ function onState (err, _state) {
   // Restart everything we were torrenting last time the app ran
   resumeTorrents()
 
-  // Initialize ReactDOM
-  ReactDOM.render(
-    <App state={state} ref={elem => { app = elem }} />,
-    document.querySelector('#body')
-  )
+  // Initialize React once; render new props whenever the shared state changes.
+  root = createRoot(document.querySelector('#body'))
+  root.render(<App state={state} />)
 
   // Calling update() updates the UI given the current state
   // Do this at least once a second to give every file in every torrentSummary
@@ -172,7 +157,7 @@ function onState (err, _state) {
   window.addEventListener('focus', onFocus)
   window.addEventListener('blur', onBlur)
 
-  if (electron.remote.getCurrentWindow().isVisible()) {
+  if (remote.getCurrentWindow().isVisible()) {
     sound.play('STARTUP')
   }
 
@@ -217,7 +202,7 @@ function lazyLoadCast () {
 // 4. controller - the controller handles the event, changing the state object
 function update () {
   controllers.playback().showOrHidePlayerControls()
-  app.setState(state)
+  root.render(<App state={state} />)
   updateElectron()
 }
 
@@ -440,7 +425,7 @@ function resumeTorrents () {
 // Set window dimensions to match video dimensions or fill the screen
 function setDimensions (dimensions) {
   // Don't modify the window size if it's already maximized
-  if (electron.remote.getCurrentWindow().isMaximized()) {
+  if (remote.getCurrentWindow().isMaximized()) {
     state.window.bounds = null
     return
   }
@@ -452,7 +437,7 @@ function setDimensions (dimensions) {
     width: window.outerWidth,
     height: window.outerHeight
   }
-  state.window.wasMaximized = electron.remote.getCurrentWindow().isMaximized
+  state.window.wasMaximized = remote.getCurrentWindow().isMaximized()
 
   // Limit window size to screen size
   const screenWidth = window.screen.width

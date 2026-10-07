@@ -248,6 +248,7 @@ table {
 }
 
 .modal .modal-content {
+  display: flow-root;
   position: fixed;
   top: 38px;
   left: 0;
@@ -969,7 +970,7 @@ video::-webkit-media-text-track-container {
 }
 
 /**
- * Use this class on Material UI components to get correct native app behavior:
+ * Use this class on interactive controls to get correct native app behavior:
  *
  * - Dragging the button should NOT drag the entire app window
  * - The cursor should be default, not a pointer (hand) like on the web
@@ -982,4 +983,138 @@ video::-webkit-media-text-track-container {
 
 .control * {
   cursor: default !important;
+}
+
+/* Local UI controls. The app is dark; modal controls use the light palette. */
+.app {
+  --control-text: #fafafa;
+  --control-muted: #bdbdbd;
+  --control-surface: #424242;
+  --control-border: #757575;
+  --control-accent: #ff5252;
+  color-scheme: dark;
+}
+
+.modal {
+  --control-text: #222;
+  --control-muted: #666;
+  --control-surface: #fff;
+  --control-border: #999;
+  --control-accent: #00796b;
+  color-scheme: light;
+}
+
+.ui-button {
+  min-height: 36px;
+  min-width: 88px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--control-surface);
+  color: var(--control-text);
+  font: inherit;
+  font-weight: 500;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.ui-button-flat {
+  background: transparent;
+  box-shadow: none;
+}
+
+.ui-button-primary {
+  background: #fafafa;
+  color: #222;
+}
+
+.modal .ui-button-primary {
+  background: var(--control-accent);
+  color: #fff;
+}
+
+.ui-button:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.ui-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.ui-button:disabled {
+  opacity: 0.5;
+}
+
+.ui-button:focus-visible,
+.ui-checkbox input:focus-visible {
+  outline: 2px solid var(--control-accent);
+  outline-offset: 3px;
+}
+
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--control-text);
+}
+
+.ui-checkbox input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--control-text);
+}
+
+.ui-text-field {
+  display: inline-block;
+  min-width: 0;
+  width: 256px;
+  vertical-align: middle;
+}
+
+.ui-text-field input,
+.ui-text-field textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--control-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--control-text);
+  font: inherit;
+  line-height: 21px;
+  outline: none;
+  user-select: text;
+}
+
+.ui-text-field textarea {
+  resize: vertical;
+}
+
+.ui-text-field input:focus,
+.ui-text-field textarea:focus {
+  border-bottom: 2px solid var(--control-accent);
+}
+
+.ui-text-field input::placeholder,
+.ui-text-field textarea::placeholder {
+  color: var(--control-muted);
+}
+
+.ui-progress {
+  appearance: none;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.ui-progress::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.ui-progress::-webkit-progress-value {
+  background: var(--control-text);
 }

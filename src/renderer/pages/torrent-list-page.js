@@ -1,8 +1,6 @@
+const { Checkbox, ProgressBar } = require('../components/ui')
 const React = require('react')
 const prettyBytes = require('prettier-bytes')
-
-const Checkbox = require('material-ui/Checkbox').default
-const LinearProgress = require('material-ui/LinearProgress').default
 
 const TorrentSummary = require('../lib/torrent-summary')
 const TorrentPlayer = require('../lib/torrent-player')
@@ -130,13 +128,10 @@ module.exports = class TorrentList extends React.Component {
             display: 'inline-block',
             width: 32
           }}
-          iconStyle={{
-            width: 20,
-            height: 20
-          }}
+          aria-label={isActive ? 'Pause torrent' : 'Resume torrent'}
           checked={isActive}
           onClick={stopPropagation}
-          onCheck={dispatcher('toggleTorrent', infoHash)}
+          onChange={dispatcher('toggleTorrent', infoHash)}
         />
       )
     }
@@ -155,7 +150,7 @@ module.exports = class TorrentList extends React.Component {
       }
       return (
         <div key='progress-bar' style={styles.wrapper}>
-          <LinearProgress style={styles.progress} mode='determinate' value={progress} />
+          <ProgressBar style={styles.progress} aria-label='Download progress' value={progress} />
         </div>
       )
     }

@@ -80,6 +80,17 @@ $ npm test
 
 ### Run integration tests
 
+Run the React UI interaction checks in Electron, without WebDriver:
+
+```
+$ npm run test-ui
+```
+
+These checks cover preferences, torrent creation, download toggling, modal keyboard
+behavior, and native controls. They do not connect to torrent networks.
+
+Run the existing screenshot integration suite:
+
 ```
 $ npm run test-integration
 ```
@@ -171,10 +182,11 @@ Electron (Framework to make native apps for Windows, OSX and Linux in Javascript
 https://electronjs.org/docs/tutorial/quick-start
 
 React.js (Framework to work with Frontend UI):
-https://reactjs.org/docs/getting-started.html
+https://react.dev/learn
 
-Material UI (React components that implement Google's Material Design.):
-https://material-ui.com/getting-started/installation
+UI controls are local React components backed by native HTML controls in
+`src/renderer/components/ui/`, styled in `static/main.css`. No component framework
+or theme provider is required.
 
 ### Privacy
 

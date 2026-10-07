@@ -1,12 +1,10 @@
+const { Button, TextField } = require('./ui')
 const path = require('path')
 
-const colors = require('material-ui/styles/colors')
+const colors = require('./ui/colors')
 const remote = require('@electron/remote')
 const React = require('react')
 const PropTypes = require('prop-types')
-
-const RaisedButton = require('material-ui/RaisedButton').default
-const TextField = require('material-ui/TextField').default
 
 // Lets you pick a file or directory.
 // Uses the system Open File dialog.
@@ -66,14 +64,14 @@ class PathSelector extends React.Component {
 
     return (
       <div className={this.props.className} style={wrapperStyle}>
-        <div className='label' style={labelStyle}>
+        <label htmlFor={id} className='label' style={labelStyle}>
           {this.props.title}:
-        </div>
+        </label>
         <TextField
-          className='control' disabled id={id} value={text}
+          className='control' readOnly id={id} value={text}
           inputStyle={textareaStyle} style={textFieldStyle}
         />
-        <RaisedButton
+        <Button
           className='control' label='Change' onClick={this.handleClick}
           style={buttonStyle}
         />

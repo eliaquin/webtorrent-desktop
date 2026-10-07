@@ -1,10 +1,8 @@
+const { Button, TextField, Checkbox } = require('../components/ui')
 const React = require('react')
 const PropTypes = require('prop-types')
 
-const colors = require('material-ui/styles/colors')
-const Checkbox = require('material-ui/Checkbox').default
-const RaisedButton = require('material-ui/RaisedButton').default
-const TextField = require('material-ui/TextField').default
+const colors = require('../components/ui/colors')
 const Heading = require('../components/heading')
 const PathSelector = require('../components/path-selector')
 
@@ -67,13 +65,14 @@ class PreferencesPage extends React.Component {
           className='control'
           checked={!this.props.state.saved.prefs.openExternalPlayer}
           label='Play torrent media files using WebTorrent'
-          onCheck={this.handleOpenExternalPlayerChange}
+          onChange={this.handleOpenExternalPlayerChange}
         />
       </Preference>
     )
   }
 
-  handleOpenExternalPlayerChange (e, isChecked) {
+  handleOpenExternalPlayerChange (e) {
+    const isChecked = e.target.checked
     dispatch('updatePreferences', 'openExternalPlayer', !isChecked)
   }
 
@@ -84,14 +83,15 @@ class PreferencesPage extends React.Component {
           className='control'
           checked={this.props.state.saved.prefs.highestPlaybackPriority}
           label='Highest Playback Priority'
-          onCheck={this.handleHighestPlaybackPriorityChange}
+          onChange={this.handleHighestPlaybackPriorityChange}
         />
         <p>Pauses all active torrents to allow playback to use all of the available bandwidth.</p>
       </Preference>
     )
   }
 
-  handleHighestPlaybackPriorityChange (e, isChecked) {
+  handleHighestPlaybackPriorityChange (e) {
+    const isChecked = e.target.checked
     dispatch('updatePreferences', 'highestPlaybackPriority', isChecked)
   }
 
@@ -130,13 +130,14 @@ class PreferencesPage extends React.Component {
           className='control'
           checked={this.props.state.saved.prefs.autoAddTorrents}
           label='Watch for new .torrent files and add them immediately'
-          onCheck={(e, value) => { this.handleAutoAddTorrentsChange(e, value) }}
+          onChange={(e) => { this.handleAutoAddTorrentsChange(e) }}
         />
       </Preference>
     )
   }
 
-  handleAutoAddTorrentsChange (e, isChecked) {
+  handleAutoAddTorrentsChange (e) {
+    const isChecked = e.target.checked
     const torrentsFolderPath = this.props.state.saved.prefs.torrentsFolderPath
     if (isChecked && !torrentsFolderPath) {
       alert('Select a torrents folder first.') // eslint-disable-line
@@ -188,7 +189,7 @@ class PreferencesPage extends React.Component {
     return (
       <Preference>
         <p>WebTorrent is not currently the default torrent app.</p>
-        <RaisedButton
+        <Button
           className='control'
           onClick={this.handleSetDefaultApp}
           label='Make WebTorrent the default'
@@ -197,7 +198,8 @@ class PreferencesPage extends React.Component {
     )
   }
 
-  handleStartupChange (e, isChecked) {
+  handleStartupChange (e) {
+    const isChecked = e.target.checked
     dispatch('updatePreferences', 'startup', isChecked)
   }
 
@@ -212,7 +214,7 @@ class PreferencesPage extends React.Component {
           className='control'
           checked={this.props.state.saved.prefs.startup}
           label='Open WebTorrent on startup'
-          onCheck={this.handleStartupChange}
+          onChange={this.handleStartupChange}
         />
       </Preference>
     )
@@ -225,13 +227,14 @@ class PreferencesPage extends React.Component {
           className='control'
           checked={this.props.state.saved.prefs.soundNotifications}
           label='Enable sounds'
-          onCheck={this.handleSoundNotificationsChange}
+          onChange={this.handleSoundNotificationsChange}
         />
       </Preference>
     )
   }
 
-  handleSoundNotificationsChange (e, isChecked) {
+  handleSoundNotificationsChange (e) {
+    const isChecked = e.target.checked
     dispatch('updatePreferences', 'soundNotifications', isChecked)
   }
 
@@ -248,9 +251,10 @@ class PreferencesPage extends React.Component {
       <Preference>
         <TextField
           className='torrent-trackers control'
+          aria-label='Global trackers'
           style={textFieldStyle}
           textareaStyle={textareaStyle}
-          multiLine
+          multiline
           rows={2}
           rowsMax={10}
           value={this.state.globalTrackers}
@@ -260,7 +264,8 @@ class PreferencesPage extends React.Component {
     )
   }
 
-  handleSetGlobalTrackers (e, globalTrackers) {
+  handleSetGlobalTrackers (e) {
+    const globalTrackers = e.target.value
     this.setState({ globalTrackers })
 
     const announceList = globalTrackers

@@ -1,14 +1,10 @@
+const { Button, TextField, Checkbox } = require('../components/ui')
 const createTorrent = require('create-torrent')
 const path = require('path')
 const prettyBytes = require('prettier-bytes')
 const React = require('react')
 
 const { dispatch, dispatcher } = require('../lib/dispatcher')
-
-const FlatButton = require('material-ui/FlatButton').default
-const RaisedButton = require('material-ui/RaisedButton').default
-const TextField = require('material-ui/TextField').default
-const Checkbox = require('material-ui/Checkbox').default
 
 const CreateTorrentErrorPage = require('../components/create-torrent-error-page')
 const Heading = require('../components/heading')
@@ -65,9 +61,9 @@ class CreateTorrentPage extends React.Component {
     }
 
     // Create React event handlers only once
-    this.handleSetIsPrivate = (_, isPrivate) => this.setState({ isPrivate })
-    this.handleSetComment = (_, comment) => this.setState({ comment })
-    this.handleSetTrackers = (_, trackers) => this.setState({ trackers })
+    this.handleSetIsPrivate = (e) => this.setState({ isPrivate: e.target.checked })
+    this.handleSetComment = (e) => this.setState({ comment: e.target.value })
+    this.handleSetTrackers = (e) => this.setState({ trackers: e.target.value })
     this.handleSubmit = handleSubmit.bind(this)
   }
 
@@ -99,7 +95,8 @@ class CreateTorrentPage extends React.Component {
           {this.renderAdvanced()}
         </ShowMore>
         <div className='float-right'>
-          <FlatButton
+          <Button
+            variant='flat'
             className='control cancel'
             label='Cancel'
             style={{
@@ -107,7 +104,7 @@ class CreateTorrentPage extends React.Component {
             }}
             onClick={dispatcher('cancel')}
           />
-          <RaisedButton
+          <Button
             className='control create-torrent-button'
             label='Create Torrent'
             primary
@@ -144,18 +141,20 @@ class CreateTorrentPage extends React.Component {
           <label>Private:</label>
           <Checkbox
             className='torrent-is-private control'
+            aria-label='Private torrent'
             style={{ display: '' }}
             checked={this.state.isPrivate}
-            onCheck={this.handleSetIsPrivate}
+            onChange={this.handleSetIsPrivate}
           />
         </div>
         <div key='trackers' className='torrent-attribute'>
           <label>Trackers:</label>
           <TextField
             className='torrent-trackers control'
+            aria-label='Trackers'
             style={textFieldStyle}
             textareaStyle={textareaStyle}
-            multiLine
+            multiline
             rows={2}
             rowsMax={10}
             value={this.state.trackers}
@@ -166,10 +165,11 @@ class CreateTorrentPage extends React.Component {
           <label>Comment:</label>
           <TextField
             className='torrent-comment control'
+            aria-label='Comment'
             style={textFieldStyle}
             textareaStyle={textareaStyle}
-            hintText='Optionally describe your torrent...'
-            multiLine
+            placeholder='Optionally describe your torrent...'
+            multiline
             rows={2}
             rowsMax={10}
             value={this.state.comment}

@@ -1,5 +1,5 @@
+const { TextField } = require('./ui')
 const React = require('react')
-const TextField = require('material-ui/TextField').default
 const { clipboard } = require('electron')
 
 const ModalOKCancel = require('./modal-ok-cancel')
@@ -10,7 +10,7 @@ module.exports = class OpenTorrentAddressModal extends React.Component {
   render () {
     return (
       <div className='open-torrent-address-modal'>
-        <p><label>Enter torrent address or magnet link</label></p>
+        <p><label htmlFor='torrent-address-field'>Enter torrent address or magnet link</label></p>
         <div>
           <TextField
             id='torrent-address-field'
@@ -31,21 +31,22 @@ module.exports = class OpenTorrentAddressModal extends React.Component {
   }
 
   componentDidMount () {
-    this.torrentURL.input.focus()
+    this.torrentURL.focus()
     const clipboardContent = clipboard.readText()
 
     if (isMagnetLink(clipboardContent)) {
-      this.torrentURL.input.value = clipboardContent
-      this.torrentURL.input.select()
+      this.torrentURL.value = clipboardContent
+      this.torrentURL.select()
     }
   }
 }
 
 function handleKeyDown (e) {
-  if (e.which === 13) handleOK.call(this) /* hit Enter to submit */
+  if (e.key === 'Enter') handleOK.call(this) /* hit Enter to submit */
 }
 
 function handleOK () {
+  const torrentURL = this.torrentURL.value
   dispatch('exitModal')
-  dispatch('addTorrent', this.torrentURL.input.value)
+  dispatch('addTorrent', torrentURL)
 }

@@ -12,10 +12,11 @@
       [
         "@babel/plugin-transform-react-jsx",
         {
-          "useBuiltIns": true
+          "runtime": "automatic"
         }
       ]
-    ]
+    ],
+    "sourceType": "unambiguous"
   },
   "bugs": {
     "url": "https://github.com/webtorrent/webtorrent-desktop/issues"
@@ -39,14 +40,13 @@
     "iso-639-1": "2.1.15",
     "languagedetect": "2.0.0",
     "location-history": "1.1.2",
-    "material-ui": "0.20.2",
     "music-metadata": "7.14.0",
     "network-address": "1.1.2",
     "parse-torrent": "9.1.5",
     "prettier-bytes": "1.0.4",
     "prop-types": "15.8.1",
-    "react": "17.0.2",
-    "react-dom": "17.0.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "rimraf": "4.4.1",
     "run-parallel": "1.2.0",
     "semver": "7.8.5",
@@ -119,7 +119,8 @@
     "test": "standard && depcheck --ignores=standard,@babel/eslint-parser --ignore-dirs=build,dist",
     "test-integration": "npm run build && node ./test",
     "update-authors": "./bin/update-authors.sh",
-    "watch": "nodemon --exec \"npm run start\" --ext js,css --ignore build/ --ignore dist/"
+    "watch": "nodemon --exec \"npm run start\" --ext js,css --ignore build/ --ignore dist/",
+    "test-ui": "npm run build && electron test/ui.js"
   },
   "standard": {
     "parser": "@babel/eslint-parser"
