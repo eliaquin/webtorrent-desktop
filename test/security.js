@@ -86,15 +86,54 @@ async function main () {
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-security-'))
   let application
+  let page
   try {
-    fs.mkdirSync(path.join(directory, 'Downloads'))
-    const prefs = { downloadPath: path.join(directory, 'Downloads'), isFileHandler: false, openExternalPlayer: false, externalPlayerPath: '', startup: false, soundNotifications: false, autoAddTorrents: false, torrentsFolderPath: '', highestPlaybackPriority: true, globalTrackers: [] }
-    fs.writeFileSync(path.join(directory, 'config.json'), JSON.stringify({ version: '0.24.0', prefs, torrents: [], torrentsToResume: [] }))
+    const downloads = path.join(directory, 'Downloads')
+    fs.mkdirSync(downloads)
+    const video = path.join(__dirname, 'resources/monitor-test.mp4')
+    const { default: createTorrent } = await import('create-torrent')
+    const { default: parseTorrent } = await import('parse-torrent')
+    const metadata = await new Promise((resolve, reject) => createTorrent(video, { announce: [] }, (err, data) => err ? reject(err) : resolve(data)))
+    const parsed = await parseTorrent(metadata)
+    const torrentFileName = parsed.infoHash + '.torrent'
+    fs.mkdirSync(path.join(directory, 'Torrents'))
+    fs.writeFileSync(path.join(directory, 'Torrents', torrentFileName), metadata)
+    const prefs = { downloadPath: downloads, isFileHandler: false, openExternalPlayer: false, externalPlayerPath: '', startup: false, soundNotifications: false, autoAddTorrents: false, torrentsFolderPath: '', highestPlaybackPriority: true, globalTrackers: [] }
+    const unwritten = { status: 'new', name: parsed.name, infoHash: parsed.infoHash, files: parsed.files, path: downloads, torrentFileName }
+    fs.writeFileSync(path.join(directory, 'config.json'), JSON.stringify({ version: '0.24.0', prefs, torrents: [unwritten], torrentsToResume: [] }))
     const packaged = process.env.WEBTORRENT_PACKAGED_APP
     application = await _electron.launch({ executablePath: packaged || require('electron'), args: packaged ? ['--hidden'] : [path.join(__dirname, '..'), '--hidden'], env: { ...process.env, NODE_ENV: 'test', WEBTORRENT_TEST_DIR: directory }, timeout: 30000 })
-    let page = application.windows().find(page => page.url().endsWith('/main.html'))
+    page = application.windows().find(page => page.url().endsWith('/main.html'))
     if (!page) page = await application.waitForEvent('window', { predicate: page => page.url().endsWith('/main.html') })
     await page.waitForSelector('.app')
+    await page.waitForFunction(() => document.querySelector('.torrent')?.textContent.includes('Downloading'))
+    assert(!(await page.locator('.torrent').innerText()).includes('Path missing'), 'startup can resume metadata before any data file exists')
+    await page.getByRole('checkbox', { name: 'Pause torrent' }).click()
+    // Resume that unwritten download using local data and play without FFmpeg.
+    fs.copyFileSync(video, path.join(downloads, parsed.files[0].path))
+    async function dispatch (...args) {
+      await application.evaluate((electron, args) => {
+        const root = electron.app.getAppPath()
+        const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+        fromProject(root + '/build/main/windows').main.dispatch(...args)
+      }, args)
+    }
+    await dispatch('backToList')
+    await dispatch('toggleTorrent', parsed.infoHash)
+    await page.waitForFunction(name => [...document.querySelectorAll('.torrent')].some(row => row.textContent.includes(name) && row.textContent.includes('Seeding')), parsed.name)
+    await dispatch('playFile', parsed.infoHash, 0)
+    await page.waitForFunction(() => document.querySelector('video')?.readyState >= 2)
+    await page.waitForFunction(() => document.querySelector('video')?.currentTime > 0)
+    assert.strictEqual(await page.locator('.error-popover.visible').count(), 0, 'video playback must not show optional subtitle tool errors')
+    const subtitle = path.join(directory, 'external.srt')
+    fs.writeFileSync(subtitle, '1\n00:00:00,000 --> 00:00:06,000\nExternal subtitles still work\n')
+    await dispatch('addSubtitles', [subtitle], true)
+    await page.waitForSelector('video track', { state: 'attached' })
+    await dispatch('playPause')
+    await dispatch('skipTo', 1)
+    await page.waitForFunction(() => document.querySelector('video')?.textTracks[0]?.activeCues?.[0]?.text === 'External subtitles still work')
+    console.log('Playback smoke checks passed: unwritten startup, pause/resume, verified local video playback without tool errors and external subtitles')
+    await dispatch('backToList')
     // Exercise the actual utility-process command path, not just Node imports.
     const seedPath = path.join(directory, 'Downloads', 'utility-test.txt')
     fs.writeFileSync(seedPath, 'Utility process streaming regression')
@@ -146,7 +185,20 @@ async function main () {
     const beforeNavigation = page.url()
     await page.evaluate(() => { window.location.href = 'https://example.com' })
     assert.strictEqual(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/main.html')).webContents.getURL()), beforeNavigation, 'remote navigation must be blocked')
+
     console.log('Security checks passed: IP bypasses, blocklists, casting parsers, metadata, media authorization, real torrent streaming and ranges, DNS rebinding, isolated app startup, CSP, denied popups/navigation, forged IPC, preferences')
+  } catch (error) {
+    if (page) {
+      console.error(await page.evaluate(() => {
+        const video = document.querySelector('video')
+        return {
+          body: document.body.innerText.slice(-1000),
+          video: video && { currentTime: video.currentTime, paused: video.paused, error: video.error?.message },
+          subtitles: video && [...video.textTracks].map(track => ({ mode: track.mode, cues: [...(track.cues || [])].map(cue => cue.text), active: [...(track.activeCues || [])].map(cue => cue.text) }))
+        }
+      }))
+    }
+    throw error
   } finally {
     if (application) await application.close()
     fs.rmSync(directory, { recursive: true, force: true })

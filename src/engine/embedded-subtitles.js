@@ -18,7 +18,7 @@ function findTool (name) {
       return candidate
     } catch (_) {}
   }
-  throw new Error('Embedded subtitles require FFmpeg and ffprobe. Install FFmpeg to enable them.')
+  return null
 }
 
 function languageName (code) {
@@ -33,6 +33,8 @@ function languageName (code) {
 async function extractEmbeddedSubtitles (filePath) {
   const ffprobe = findTool('ffprobe')
   const ffmpeg = findTool('ffmpeg')
+  // Automatic discovery is optional; missing tools must not interrupt playback.
+  if (!ffprobe || !ffmpeg) return []
   const options = { encoding: 'utf8', timeout: 60000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
   const { stdout } = await run(ffprobe, ['-v', 'error', '-protocol_whitelist', 'file,pipe', '-select_streams', 's', '-show_entries', 'stream=index,codec_name:stream_tags=language,title:stream_disposition=default,forced', '-of', 'json', filePath], options)
   const streams = JSON.parse(stdout).streams || []

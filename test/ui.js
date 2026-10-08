@@ -33,6 +33,7 @@ app.whenReady().then(async () => {
     webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false }
   })
   await win.loadFile(fixture)
+  console.log(await win.webContents.executeJavaScript(`(${runPlaybackRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
   const result = await win.webContents.executeJavaScript(`(${runUI.toString()})(${JSON.stringify(projectRoot)})`)
   console.log(result)
   if (process.env.UI_SCREENSHOT_PATH) {
@@ -46,6 +47,124 @@ app.whenReady().then(async () => {
   console.error(err)
   finish(1)
 })
+
+async function runPlaybackRegressions (projectRoot, directory) {
+  const assert = require('assert')
+  const fs = require('fs')
+  const path = require('path')
+  const { ipcRenderer } = require('electron')
+  const native = require(projectRoot + '/build/renderer/lib/native-api')
+  const dispatcher = require(projectRoot + '/build/renderer/lib/dispatcher')
+  const TorrentListController = require(projectRoot + '/build/renderer/controllers/torrent-list-controller')
+  const SubtitlesController = require(projectRoot + '/build/renderer/controllers/subtitles-controller')
+  const { createStore } = require(projectRoot + '/build/renderer/lib/store')
+  const { extractEmbeddedSubtitles } = require(projectRoot + '/build/engine/embedded-subtitles')
+  const { readSubtitle } = require(projectRoot + '/build/engine/subtitles')
+  const originals = { send: ipcRenderer.send, statPath: native.statPath, extract: native.extractEmbeddedSubtitles, access: fs.accessSync }
+  const events = []
+  const commands = []
+  const state = createStore({
+    saved: {
+      prefs: { downloadPath: directory },
+      torrents: [{ torrentKey: 1, infoHash: 'resume-test', status: 'paused', path: directory, files: [{ path: 'not-downloaded.mp4' }] }],
+      torrentsToResume: []
+    }
+  }).state
+  const torrent = state.saved.torrents[0]
+  const controller = new TorrentListController(state)
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+  try {
+    ipcRenderer.send = (...args) => commands.push(args)
+    native.statPath = filepath => fs.promises.stat(filepath)
+    dispatcher.setDispatch((...args) => events.push(args))
+
+    // Default torrents already have metadata but may never have written a file.
+    controller.toggleTorrent(torrent.infoHash)
+    await settle()
+    assert.strictEqual(commands.at(-1)?.[0], 'wt-start-torrenting')
+    assert(!torrent.error, 'resuming an unwritten download does not mark its path missing')
+    controller.toggleTorrent(torrent.infoHash)
+    controller.resumeAllTorrents()
+    await settle()
+    assert.strictEqual(commands.at(-1)[0], 'wt-start-torrenting', 'Resume All restarts an unwritten download')
+    controller.prioritizeTorrent('another-torrent')
+    controller.resumePausedTorrents()
+    await settle()
+    assert(!torrent.error, 'playback priority can pause and resume an unwritten download')
+    torrent.status = 'new'
+    await controller.startTorrentingSummary(1)
+    assert(!torrent.error, 'startup can resume metadata without data files')
+    assert.deepStrictEqual(events, [])
+
+    // Keep the moved/deleted data safeguard for completed downloads.
+    torrent.fileModtimes = [Date.now()]
+    const starts = commands.length
+    await controller.startTorrentingSummary(1)
+    assert.strictEqual(torrent.error, 'path-missing')
+    assert.strictEqual(commands.length, starts, 'missing completed data is not redownloaded silently')
+    fs.writeFileSync(path.join(directory, torrent.files[0].path), 'restored data')
+    await controller.startTorrentingSummary(1)
+    assert(!torrent.error, 'restoring the data clears the old path error')
+
+    // An outstanding filesystem check must respect later UI actions.
+    let finishStat
+    native.statPath = () => new Promise(resolve => { finishStat = resolve })
+    const pending = controller.startTorrentingSummary(1)
+    controller.pauseTorrent(torrent, false)
+    const pausedCommands = commands.length
+    finishStat({})
+    await pending
+    assert.strictEqual(commands.length, pausedCommands, 'a late stat cannot undo Pause')
+    torrent.status = 'new'
+    const removed = controller.startTorrentingSummary(1)
+    state.saved.torrents = []
+    finishStat({})
+    await removed
+    assert.strictEqual(commands.length, pausedCommands, 'a late stat cannot restart a removed torrent')
+
+    const external = path.join(directory, 'external.srt')
+    fs.writeFileSync(external, '1\n00:00:00,000 --> 00:00:06,000\nExternal subtitles still work\n')
+    const converted = await readSubtitle(external)
+    const vtt = Buffer.from(converted.buffer.split(',')[1], 'base64').toString()
+    assert(vtt.startsWith('WEBVTT') && vtt.includes('00:00:00.000 --> 00:00:06.000'), 'legacy SRT streams convert successfully')
+    const webvtt = path.join(directory, 'external.vtt')
+    fs.writeFileSync(webvtt, vtt)
+    assert.strictEqual((await readSubtitle(webvtt)).buffer, converted.buffer, 'WebVTT is preserved without a duplicate header')
+    await assert.rejects(readSubtitle(path.join(directory, 'missing.srt')), { code: 'ENOENT' }, 'subtitle read errors reach the caller')
+
+    // Simulate either optional tool being absent, regardless of the host PATH.
+    const subtitles = { tracks: [], selectedIndex: -1 }
+    const playback = {
+      playing: { type: 'video', location: 'local', fileIndex: 0, subtitles },
+      getPlayingTorrentSummary: () => ({ path: directory, status: 'seeding' }),
+      getPlayingFileSummary: () => torrent.files[0]
+    }
+    const subtitleController = new SubtitlesController(playback)
+    native.extractEmbeddedSubtitles = extractEmbeddedSubtitles
+    events.length = 0
+    for (const missing of ['ffmpeg', 'ffprobe', 'both']) {
+      fs.accessSync = candidate => {
+        const tool = path.basename(candidate).replace(/\.exe$/, '')
+        if (missing === 'both' || tool === missing) throw new Error('Tool unavailable')
+      }
+      playback.playing.subtitles = { tracks: [], selectedIndex: -1 }
+      subtitleController.checkForEmbeddedSubtitles()
+      await settle()
+      assert(playback.playing.subtitles.checkedEmbedded, 'discovery finishes without ' + missing)
+      assert(!playback.playing.subtitles.loadingEmbedded)
+      assert.deepStrictEqual(playback.playing.subtitles.tracks, [])
+      subtitleController.checkForEmbeddedSubtitles()
+    }
+    assert.deepStrictEqual(events, [], 'missing optional subtitle tools do not open an error window')
+    assert.strictEqual(playback.playing.type, 'video')
+    return 'Playback regression tests passed: unwritten downloads, Resume All, priority, startup, completed data safeguard, stale checks, SRT/VTT readers and missing subtitle tools'
+  } finally {
+    ipcRenderer.send = originals.send
+    native.statPath = originals.statPath
+    native.extractEmbeddedSubtitles = originals.extract
+    fs.accessSync = originals.access
+  }
+}
 
 async function runUI (projectRoot) {
   const assert = require('assert')

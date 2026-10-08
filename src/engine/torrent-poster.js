@@ -134,6 +134,7 @@ async function torrentPosterFromVideo (torrent, cb) {
   let server
   try {
     const ffmpeg = findTool('ffmpeg')
+    if (!ffmpeg) throw new Error('Video posters require FFmpeg')
     const { NodeServer } = await import('webtorrent/lib/server.js')
     const file = getLargestFileByExtension(torrent, mediaExtensions.video)
     server = new NodeServer(torrent.client)

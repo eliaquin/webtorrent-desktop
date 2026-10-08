@@ -13,6 +13,7 @@ const instantIoRegex = /^(https:\/\/)?instant\.io\/#/
 module.exports = class TorrentListController {
   constructor (state) {
     this.state = state
+    this.pendingStarts = new WeakMap()
   }
 
   // Adds a torrent to the list, starts downloading/seeding.
@@ -79,6 +80,22 @@ module.exports = class TorrentListController {
   startTorrentingSummary (torrentKey) {
     const s = TorrentSummary.getByKey(this.state, torrentKey)
     if (!s) throw new TorrentKeyNotFoundError(torrentKey)
+    const attempt = {}
+    this.pendingStarts.set(s, attempt)
+    const isCurrent = () => this.pendingStarts.get(s) === attempt &&
+      TorrentSummary.getByKey(this.state, torrentKey) === s
+
+    const start = () => {
+      if (!isCurrent()) return
+      this.pendingStarts.delete(s)
+      delete s.error
+      ipcRenderer.send('wt-start-torrenting',
+        s.torrentKey,
+        TorrentSummary.getTorrentId(s),
+        s.path,
+        s.fileModtimes,
+        s.selections)
+    }
 
     // New torrent: give it a path
     if (!s.path) {
@@ -89,23 +106,19 @@ module.exports = class TorrentListController {
 
     const fileOrFolder = TorrentSummary.getFileOrFolder(s)
 
-    // New torrent: metadata not yet received
-    if (!fileOrFolder) return start()
+    // Metadata can exist before the first piece is written to disk. Downloads
+    // must be able to create their data files when resumed or prioritized.
+    const completed = s.status === 'seeding' || s.progress?.progress === 1 ||
+      s.fileModtimes?.some(time => time != null)
+    if (!fileOrFolder || !completed) return start()
 
-    // Existing torrent: check that the path is still there
-    native.statPath(fileOrFolder).then(start, () => {
+    // Completed torrent: avoid silently redownloading moved or deleted data.
+    return native.statPath(fileOrFolder).then(start, () => {
+      if (!isCurrent()) return
+      this.pendingStarts.delete(s)
       s.error = 'path-missing'
       dispatch('backToList')
     })
-
-    function start () {
-      ipcRenderer.send('wt-start-torrenting',
-        s.torrentKey,
-        TorrentSummary.getTorrentId(s),
-        s.path,
-        s.fileModtimes,
-        s.selections)
-    }
   }
 
   setGlobalTrackers (globalTrackers) {
@@ -129,8 +142,7 @@ module.exports = class TorrentListController {
     this.state.saved.torrents.forEach((torrentSummary) => {
       if (torrentSummary.status === 'downloading' ||
           torrentSummary.status === 'seeding') {
-        torrentSummary.status = 'paused'
-        ipcRenderer.send('wt-stop-torrenting', torrentSummary.infoHash)
+        this.pauseTorrent(torrentSummary, false)
       }
     })
     sound.play('DISABLE')
@@ -147,6 +159,7 @@ module.exports = class TorrentListController {
   }
 
   pauseTorrent (torrentSummary, playSound) {
+    this.pendingStarts.delete(torrentSummary)
     torrentSummary.status = 'paused'
     ipcRenderer.send('wt-stop-torrenting', torrentSummary.infoHash)
 
