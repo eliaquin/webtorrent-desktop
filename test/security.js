@@ -107,6 +107,7 @@ async function main () {
     if (!page) page = await application.waitForEvent('window', { predicate: page => page.url().endsWith('/main.html') })
     await page.waitForSelector('.app')
     await page.waitForFunction(() => document.querySelector('.torrent')?.textContent.includes('Downloading'))
+    await testTorrentAddressDialog(application, page)
     assert(!(await page.locator('.torrent').innerText()).includes('Path missing'), 'startup can resume metadata before any data file exists')
     await page.getByRole('checkbox', { name: 'Pause torrent' }).click()
     // Resume that unwritten download using local data and play without FFmpeg.
@@ -223,3 +224,101 @@ async function main () {
 }
 
 main().catch(err => { console.error(err); process.exitCode = 1 })
+
+async function testTorrentAddressDialog (application, page) {
+  if (process.env.MODAL_DEBUG) page.on('console', message => { if (message.text().startsWith('dispatch:')) console.log(message.text()) })
+  await application.evaluate(({ clipboard }) => {
+    globalThis.testOriginalClipboardRead = clipboard.readText
+    clipboard.readText = () => ''
+  })
+  async function windowAction (action) {
+    return application.evaluate((electron, action) => {
+      const root = electron.app.getAppPath()
+      const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+      const main = fromProject(root + '/build/main/windows').main
+      if (action === 'hide') main.hide()
+      else if (action === 'minimize') main.win.minimize()
+      else if (action === 'focused') return main.win.isVisible() && main.win.isFocused() && !main.win.isMinimized()
+      else {
+        let menu
+        if (electron.app.dock) {
+          fromProject(root + '/build/main/dock').init()
+          menu = electron.app.dock.getMenu()
+        } else menu = electron.Menu.getApplicationMenu().items.find(item => item.label === 'File').submenu
+        const item = menu.items.find(item => item.label === 'Open Torrent Address...')
+        if (!item) throw new Error('Torrent address menu item missing')
+        item.click(item)
+      }
+    }, action)
+  }
+  try {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await windowAction(attempt % 2 === 0 ? 'hide' : 'minimize')
+      const started = Date.now()
+      await windowAction('open')
+      const address = page.locator('#torrent-address-field')
+      await address.waitFor({ state: 'visible', timeout: 2000 })
+      assert(Date.now() - started < 2000, 'Dock/menu opens the address dialog promptly')
+      assert(await windowAction('focused'), 'Dock/menu restores and focuses the app window')
+      assert(await page.getByRole('button', { name: 'OK', exact: true }).isDisabled())
+      await address.press('Enter')
+      await page.getByText('Enter a torrent address or magnet link.', { exact: true }).waitFor()
+      assert.strictEqual(await page.locator('.torrent').count(), 1, 'empty input cannot create a torrent')
+      assert.strictEqual(await page.locator('.error-popover.visible').count(), 0, 'empty input does not create a persistent app error')
+      await address.fill('not a torrent')
+      await page.getByRole('button', { name: 'OK', exact: true }).click()
+      await page.getByText('Enter a valid magnet link, torrent URL, or info hash.', { exact: true }).waitFor()
+      if (process.env.ADDRESS_MODAL_SCREENSHOT && attempt === 0) await page.screenshot({ path: process.env.ADDRESS_MODAL_SCREENSHOT })
+      await address.fill('https://example.com/draft.torrent')
+      await windowAction('open')
+      assert.strictEqual(await address.inputValue(), 'https://example.com/draft.torrent', 'opening again preserves the draft')
+      assert.strictEqual(await page.evaluate(() => document.activeElement.id), 'torrent-address-field')
+      if (attempt % 2 === 0) await page.getByRole('button', { name: 'CANCEL', exact: true }).click()
+      else await address.press('Escape')
+      if (process.env.MODAL_DEBUG) console.log('Closing address attempt', attempt)
+      await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: 2000 })
+    }
+    await application.evaluate(electron => {
+      const root = electron.app.getAppPath()
+      const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+      fromProject(root + '/build/main/windows').main.dispatch('preferences')
+    })
+    await page.getByLabel('Global trackers').waitFor()
+    await windowAction('open')
+    await page.locator('#torrent-address-field').waitFor()
+    await application.evaluate(electron => {
+      const root = electron.app.getAppPath()
+      const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+      const win = fromProject(root + '/build/main/windows').main.win
+      win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ESC' })
+      win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ESC' })
+    })
+    await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: 2000 })
+    await page.getByLabel('Global trackers').waitFor({ timeout: 2000 })
+    await application.evaluate(electron => {
+      const root = electron.app.getAppPath()
+      const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+      fromProject(root + '/build/main/windows').main.dispatch('backToList')
+    })
+    async function showError () {
+      await application.evaluate(electron => {
+        const root = electron.app.getAppPath()
+        const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
+        fromProject(root + '/build/main/windows').main.dispatch('error', 'Test recoverable error')
+      })
+      await page.locator('.error-popover.visible').waitFor()
+    }
+    await showError()
+    await page.getByRole('button', { name: 'Dismiss errors', exact: true }).click()
+    await page.locator('.error-popover.visible').waitFor({ state: 'hidden' })
+    await showError()
+    await page.keyboard.press('Escape')
+    await page.locator('.error-popover.visible').waitFor({ state: 'hidden' })
+    console.log('Address dialog checks passed: repeated Dock/menu opening, hidden/minimized focus, empty/invalid input, preserved drafts, Cancel/Escape and dismissible errors')
+  } finally {
+    await application.evaluate(({ clipboard }) => {
+      clipboard.readText = globalThis.testOriginalClipboardRead
+      delete globalThis.testOriginalClipboardRead
+    })
+  }
+}

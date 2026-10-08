@@ -12,6 +12,7 @@ module.exports = {
   windowState: () => ipcRenderer.sendSync('native:window-state'),
   clipboard: {
     readText: () => ipcRenderer.sendSync('native:clipboard-read'),
+    readTextAsync: () => ipcRenderer.invoke('native:clipboard-read-text'),
     writeText: text => ipcRenderer.send('native:clipboard-write', text)
   },
   choosePath: options => ipcRenderer.invoke('native:choose-path', options),

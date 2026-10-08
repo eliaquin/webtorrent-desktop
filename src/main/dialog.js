@@ -92,6 +92,7 @@ function openTorrentFile () {
  */
 function openTorrentAddress () {
   log('openTorrentAddress')
+  windows.main.show()
   windows.main.dispatch('openTorrentAddress')
 }
 

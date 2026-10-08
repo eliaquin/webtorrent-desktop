@@ -6,8 +6,7 @@ const { dispatch } = require('../lib/dispatcher')
 const { TorrentKeyNotFoundError } = require('../../shared/errors')
 const sound = require('../lib/sound')
 const TorrentSummary = require('../lib/torrent-summary')
-
-const instantIoRegex = /^(https:\/\/)?instant\.io\/#/
+const { normalizeTorrentAddress } = require('../../shared/torrent-address')
 
 // Controls the torrent list: creating, adding, deleting, & manipulating torrents
 module.exports = class TorrentListController {
@@ -19,6 +18,7 @@ module.exports = class TorrentListController {
   // Adds a torrent to the list, starts downloading/seeding.
   // TorrentID can be a magnet URI, infohash, or torrent file: https://git.io/vik9M
   addTorrent (torrentId) {
+    if (torrentId == null) return false
     if (torrentId.path) {
       // Use path string instead of W3C File object
       torrentId = torrentId.path
@@ -26,12 +26,8 @@ module.exports = class TorrentListController {
 
     // Trim extra spaces off pasted magnet links
     if (typeof torrentId === 'string') {
-      torrentId = torrentId.trim()
-    }
-
-    // Allow a instant.io link to be pasted
-    if (typeof torrentId === 'string' && instantIoRegex.test(torrentId)) {
-      torrentId = torrentId.slice(torrentId.indexOf('#') + 1)
+      torrentId = normalizeTorrentAddress(torrentId)
+      if (!torrentId) return false
     }
 
     const torrentKey = this.state.nextTorrentKey++
@@ -40,6 +36,7 @@ module.exports = class TorrentListController {
     ipcRenderer.send('wt-start-torrenting', torrentKey, torrentId, path)
 
     dispatch('backToList')
+    return true
   }
 
   // Shows the Create Torrent page with options to seed a given file or folder

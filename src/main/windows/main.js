@@ -55,6 +55,14 @@ function init (state, options) {
   })
   secureWindow(win)
 
+  // Handle Escape once, including when a dialog's text field has focus. This
+  // also prevents the menu accelerator from handling the same key twice.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key !== 'Escape') return
+    event.preventDefault()
+    if (input.type === 'keyDown' && !input.isAutoRepeat) dispatch('escapeBack')
+  })
+
   win.loadURL(config.WINDOW_MAIN)
 
   win.once('ready-to-show', () => {
@@ -197,7 +205,9 @@ function setTitle (title) {
 
 function show () {
   if (!main.win) return
+  if (main.win.isMinimized()) main.win.restore()
   main.win.show()
+  main.win.focus()
 }
 
 // Sets whether the window should always show on top of other windows

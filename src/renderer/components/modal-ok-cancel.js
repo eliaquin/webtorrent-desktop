@@ -4,7 +4,7 @@ const React = require('react')
 module.exports = class ModalOKCancel extends React.Component {
   render () {
     const cancelStyle = { marginRight: 10, color: 'black' }
-    const { cancelText, onCancel, okText, onOK } = this.props
+    const { cancelText, onCancel, okText, onOK, okDisabled = false, okAutoFocus = true } = this.props
     return (
       <div className='float-right'>
         <Button
@@ -19,7 +19,8 @@ module.exports = class ModalOKCancel extends React.Component {
           primary
           label={okText}
           onClick={onOK}
-          autoFocus
+          disabled={okDisabled}
+          autoFocus={okAutoFocus}
         />
       </div>
     )

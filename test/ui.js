@@ -78,6 +78,10 @@ async function runPlaybackRegressions (projectRoot, directory) {
     ipcRenderer.send = (...args) => commands.push(args)
     native.statPath = filepath => fs.promises.stat(filepath)
     dispatcher.setDispatch((...args) => events.push(args))
+    state.nextTorrentKey = 2
+    for (const empty of ['', ' \n ', null]) assert.strictEqual(controller.addTorrent(empty), false)
+    assert.strictEqual(commands.length, 0, 'empty addresses never reach the torrent service')
+    assert.strictEqual(state.nextTorrentKey, 2, 'empty addresses do not allocate torrent keys')
 
     // Default torrents already have metadata but may never have written a file.
     controller.toggleTorrent(torrent.infoHash)
@@ -307,17 +311,21 @@ async function runUI (projectRoot) {
   assert.deepStrictEqual(events, [['toggleTorrent', 'abc']], 'download control does not select the torrent row')
   assert.strictEqual(document.querySelector('progress').value, 50)
 
-  const readClipboard = clipboard.readText
+  const readClipboard = clipboard.readTextAsync
   const magnet = 'magnet:?xt=urn:btih:0123456789012345678901234567890123456789'
   dispatcher.setDispatch((...args) => {
     events.push(args)
     if (args[0] === 'exitModal') {
       state.modal = null
-      root.render(h(App, { store }))
+    } else if (args[0] === 'dismissErrors') {
+      state.errors = []
     }
   })
   try {
-    clipboard.readText = () => magnet
+    const { getTorrentAddressError } = require(projectRoot + '/build/shared/torrent-address')
+    for (const valid of [magnet, ' https://example.com/download?id=1 ', '0123456789012345678901234567890123456789', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', 'instant.io/#0123456789012345678901234567890123456789']) assert.strictEqual(getTorrentAddressError(valid), '')
+    for (const invalid of ['', ' \n ', 'not a torrent', 'https://', 'magnet:?dn=video', 'javascript:alert(1)']) assert(getTorrentAddressError(invalid))
+    clipboard.readTextAsync = async () => magnet
     state.modal = { id: 'open-torrent-address-modal' }
     await render(h(App, { store }))
     const address = document.querySelector('#torrent-address-field')
@@ -328,13 +336,49 @@ async function runUI (projectRoot) {
     await act(async () => address.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
     assert.deepStrictEqual(events, [['exitModal'], ['addTorrent', magnet]], 'Enter submits the magnet link')
     assert.strictEqual(document.querySelector('[role="dialog"]'), null, 'Enter closes the modal')
-    state.modal = { id: 'open-torrent-address-modal' }
-    await render(h(App, { store }))
+    clipboard.readTextAsync = async () => ''
+    for (let i = 0; i < 5; i++) {
+      await act(async () => { state.modal = { id: 'open-torrent-address-modal' } })
+      const field = document.querySelector('#torrent-address-field')
+      assert(field, 'the modal reopens on every attempt without a forced root render')
+      assert.strictEqual(document.activeElement, field)
+      assert(button('OK').disabled, 'OK is disabled for empty input')
+      events.length = 0
+      await act(async () => field.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+      assert.deepStrictEqual(events, [], 'empty Enter does not add a torrent or close the dialog')
+      assert(document.querySelector('#torrent-address-error'))
+      await type(field, '   ')
+      assert(button('OK').disabled, 'whitespace cannot be submitted')
+      await type(field, 'not a torrent')
+      await click(button('OK'))
+      assert.deepStrictEqual(events, [], 'invalid input stays in the form')
+      assert.strictEqual(field.value, 'not a torrent', 'validation preserves the editable input')
+      await click(button('CANCEL'))
+      assert.deepStrictEqual(events.pop(), ['exitModal'], 'cancel closes the modal')
+      assert.strictEqual(document.querySelector('[role="dialog"]'), null)
+    }
+    let finishClipboard
+    clipboard.readTextAsync = () => new Promise(resolve => { finishClipboard = resolve })
+    await act(async () => { state.modal = { id: 'open-torrent-address-modal' } })
+    const field = document.querySelector('#torrent-address-field')
+    assert(field, 'a slow clipboard does not delay opening the modal')
+    await type(field, 'my draft')
+    await act(async () => finishClipboard(magnet))
+    assert.strictEqual(field.value, 'my draft', 'a late clipboard result does not overwrite typing')
     await click(button('CANCEL'))
-    assert.deepStrictEqual(events.pop(), ['exitModal'], 'cancel closes the modal')
-    assert.strictEqual(document.querySelector('[role="dialog"]'), null)
+    await act(async () => { state.modal = { id: 'open-torrent-address-modal' } })
+    await click(button('CANCEL'))
+    await act(async () => finishClipboard(magnet))
+    assert.strictEqual(document.querySelector('[role="dialog"]'), null, 'late clipboard results do not reopen a closed dialog')
+    await act(async () => { state.errors = [{ time: Date.now(), message: 'A recoverable error' }] })
+    await click(document.querySelector('[aria-label="Dismiss errors"]'))
+    assert(!document.querySelector('.error-popover.visible'), 'errors can be dismissed immediately')
+    await act(async () => { state.errors = [{ time: Date.now() - 4500, message: 'An expiring error' }] })
+    assert(document.querySelector('.error-popover.visible'))
+    await act(async () => new Promise(resolve => setTimeout(resolve, 600)))
+    assert(!document.querySelector('.error-popover.visible'), 'errors also expire without another interaction')
   } finally {
-    clipboard.readText = readClipboard
+    clipboard.readTextAsync = readClipboard
   }
 
   state.modal = null

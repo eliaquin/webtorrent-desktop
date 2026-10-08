@@ -978,6 +978,25 @@ video::-webkit-media-text-track-container {
   border-bottom: 1px solid #444;
 }
 
+.error-popover .dismiss-errors {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #bbb;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.error-popover .dismiss-errors:hover,
+.error-popover .dismiss-errors:focus-visible {
+  color: white;
+  outline: 1px solid #bbb;
+}
+
 .error-popover .title {
   font-weight: bold;
   color: #c44;

@@ -26,6 +26,7 @@ function init () {
     return require('electron').shell.openExternal(target.href)
   })
   ipcMain.on('native:clipboard-read', event => { event.returnValue = trustedSender(event) ? clipboard.readText() : '' })
+  handle('native:clipboard-read-text', () => clipboard.readText())
   ipcMain.on('native:clipboard-write', (event, text) => {
     if (trustedSender(event) && typeof text === 'string') clipboard.writeText(text)
   })

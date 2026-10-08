@@ -2,6 +2,7 @@ const createGetter = require('../../shared/lazy')
 const React = require('react')
 
 const Header = require('../components/header')
+const { dispatcher } = require('../lib/dispatcher')
 
 // Perf optimization: Needed immediately, so do not lazy load it below
 const TorrentListPage = require('./torrent-list-page')
@@ -100,7 +101,10 @@ const Errors = React.memo(function Errors ({ store }) {
   })
   return (
     <div key='errors' className={'error-popover ' + (recent.length ? 'visible' : 'hidden')}>
-      <div key='title' className='title'>Error</div>
+      <div key='title' className='title'>
+        Error
+        <button type='button' className='dismiss-errors' aria-label='Dismiss errors' onClick={dispatcher('dismissErrors')}>×</button>
+      </div>
       {recent.map((error, index) => <div key={index} className='error'>{error.message}</div>)}
     </div>
   )

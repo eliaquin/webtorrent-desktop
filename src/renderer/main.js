@@ -226,7 +226,10 @@ const dispatchHandlers = {
   // Torrent list: creating, deleting, selecting torrents
   openTorrentFile: () => ipcRenderer.send('openTorrentFile'),
   openFiles: () => ipcRenderer.send('openFiles'), /* shows the open file dialog */
-  openTorrentAddress: () => { state.modal = { id: 'open-torrent-address-modal' } },
+  openTorrentAddress: () => {
+    if (state.modal?.id === 'open-torrent-address-modal') document.querySelector('#torrent-address-field')?.focus()
+    else state.modal = { id: 'open-torrent-address-modal' }
+  },
 
   addTorrent: (torrentId) => controllers.torrentList().addTorrent(torrentId),
   showCreateTorrent: (paths) => controllers.torrentList().showCreateTorrent(paths),
@@ -332,6 +335,7 @@ const dispatchHandlers = {
   // Everything else
   onOpen,
   error: onError,
+  dismissErrors: () => { state.errors = [] },
   uncaughtError: (proc, err) => telemetry.logUncaughtError(proc, err),
   stateSave: () => State.save(state),
   stateSaveImmediate: () => State.saveImmediate(state),
@@ -405,6 +409,8 @@ function escapeBack () {
     dispatch('exitModal')
   } else if (state.playing.subtitles.showMenu) {
     dispatch('toggleSubtitlesMenu')
+  } else if (state.errors.some(error => Date.now() - error.time < 5000)) {
+    dispatch('dismissErrors')
   } else if (state.window.isFullScreen) {
     dispatch('toggleFullScreen')
   } else {
@@ -511,6 +517,7 @@ function onError (err) {
     time: new Date().getTime(),
     message: err.message || err
   })
+  state.errors = state.errors.slice(-10)
 
   update()
 }
@@ -525,6 +532,11 @@ function onPaste (e) {
 }
 
 function onKeydown (e) {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    dispatch('escapeBack')
+    return
+  }
   // prevent event fire on user input elements
   if (editableHtmlTags.has(e.target.tagName.toLowerCase())) return
 
