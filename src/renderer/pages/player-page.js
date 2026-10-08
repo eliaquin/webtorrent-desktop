@@ -810,6 +810,19 @@ function renderPlayerControls (state) {
     ))
   })
 
+  // Show live torrent download statistics beside the right-hand controls.
+  const progress = state.getPlayingTorrentSummary()?.progress
+  if (Number.isFinite(progress?.progress) && progress.progress < 1) {
+    const percent = Math.floor(100 * progress.progress)
+    const downloadSpeed = prettyBytes(progress.downloadSpeed || 0) + '/s'
+    const label = `Torrent download: ${percent}% downloaded, ${downloadSpeed}`
+    elements.push((
+      <span key='download-status' className='download-status float-right' title={label} aria-label={label}>
+        ↓ {downloadSpeed} · {percent}%
+      </span>
+    ))
+  }
+
   // Render volume slider
   const volume = state.playing.volume
   const volumeIcon = 'volume_' + (
