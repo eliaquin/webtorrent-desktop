@@ -552,6 +552,7 @@ function renderCastOptions (state) {
 function renderSubtitleOptions (state) {
   const subtitles = state.playing.subtitles
   if (!subtitles.showMenu) return
+  const hasEmbeddedSubtitles = subtitles.tracks.some(track => track.embedded)
 
   const items = subtitles.tracks.map((track, ix) => {
     const isSelected = state.playing.subtitles.selectedIndex === ix
@@ -581,11 +582,13 @@ function renderSubtitleOptions (state) {
       <li>
         <button type='button' onClick={dispatcher('openSubtitles')}>Load subtitle file…</button>
       </li>
-      <li>
-        <button type='button' disabled={subtitles.loadingEmbedded || subtitles.checkingTools} onClick={dispatcher('findEmbeddedSubtitles')}>
-          Find embedded subtitles
-        </button>
-      </li>
+      {!hasEmbeddedSubtitles && (
+        <li>
+          <button type='button' disabled={subtitles.loadingEmbedded || subtitles.checkingTools} onClick={dispatcher('findEmbeddedSubtitles')}>
+            Find embedded subtitles
+          </button>
+        </li>
+      )}
       {subtitles.showInstallNotice && (
         <li className='subtitle-install-help'>
           <strong>Enable embedded subtitles</strong>
@@ -597,7 +600,7 @@ function renderSubtitleOptions (state) {
         </li>
       )}
       {subtitles.showInstallSteps && renderSubtitleInstallSteps(subtitles)}
-      {!subtitles.showInstallNotice && !subtitles.showInstallSteps && subtitles.embeddedMessage && (
+      {!hasEmbeddedSubtitles && !subtitles.showInstallNotice && !subtitles.showInstallSteps && subtitles.embeddedMessage && (
         <li className='subtitle-status' role='status'>
           {subtitles.embeddedMessage}
           {subtitles.toolsAvailable === false && <button type='button' onClick={dispatcher('showSubtitleInstallSteps')}>Show installation steps</button>}
