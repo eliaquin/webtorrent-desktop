@@ -89,6 +89,7 @@ function getDefaultPlayState () {
       showInstallSteps: false,
       embeddedMessage: ''
     },
+    audioSupport: {},
     audioTracks: {
       tracks: [],
       selectedIndex: 0, /* current audio track */

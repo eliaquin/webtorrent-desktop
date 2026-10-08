@@ -208,6 +208,16 @@ On macOS, install them with `brew install ffmpeg`. Image subtitles such as PGS
 and VobSub are not supported. WebVTT conversion preserves text and timing, but
 does not reproduce ASS fonts, positioning, or animation.
 
+Videos whose audio Chromium cannot decode (such as AC-3) are checked with
+`ffprobe` once the selected file finishes downloading. When audio is present,
+FFmpeg creates a compatible playback copy with AAC audio and the original video
+packets. Playback pauses during conversion and resumes at the same position.
+Copies are reused from `AudioCache` in the application configuration directory;
+original torrent files are never changed, so seeding is unaffected. The cache can
+be deleted while the app is closed to reclaim space. Conversion requires FFmpeg
+and FFprobe; failures offer the existing external-player fallback. Casting and
+external players continue to receive the original torrent stream.
+
 ### Privacy
 
 WebTorrent Desktop collects some basic usage stats to help us make the app better.

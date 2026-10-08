@@ -62,6 +62,11 @@ function init () {
       await fs.rm(path.join(config.POSTER_PATH, poster), { force: true })
     }
   })
+  const audio = require('../engine/audio-support')
+  require('electron').app.once('will-quit', audio.cancelConversions)
+  handle('native:probe-audio', filepath => audio.probeAudio(filepath))
+  handle('native:convert-audio', filepath => audio.convertAudio(filepath, path.join(config.CONFIG_PATH, 'AudioCache')))
+  handle('native:cancel-audio-conversions', () => audio.cancelConversions())
   handle('native:read-subtitle', filepath => require('./torrent-service').subtitleTask('text', filepath))
   handle('native:extract-embedded-subtitles', filepath => require('./torrent-service').subtitleTask('embedded', filepath))
   handle('native:subtitle-tools-available', () => {

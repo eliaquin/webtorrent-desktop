@@ -34,6 +34,7 @@ app.whenReady().then(async () => {
   })
   await win.loadFile(fixture)
   console.log(await win.webContents.executeJavaScript(`(${runPlaybackRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
+  console.log(await win.webContents.executeJavaScript(`(${runAudioRegressions.toString()})(${JSON.stringify(projectRoot)})`))
   const result = await win.webContents.executeJavaScript(`(${runUI.toString()})(${JSON.stringify(projectRoot)})`)
   console.log(result)
   if (process.env.UI_SCREENSHOT_PATH) {
@@ -203,6 +204,82 @@ async function runPlaybackRegressions (projectRoot, directory) {
     native.subtitleToolsAvailable = originals.tools
     native.clipboard.writeText = originals.copy
     clearTimeout(subtitleController?.toolsTimer)
+  }
+}
+
+async function runAudioRegressions (projectRoot) {
+  const assert = require('assert')
+  const native = require(projectRoot + '/build/renderer/lib/native-api')
+  const MediaController = require(projectRoot + '/build/renderer/controllers/media-controller')
+  const originals = { probe: native.probeAudio, convert: native.convertAudio, cancel: native.cancelAudioConversions }
+  const torrent = { path: '/downloads', status: 'downloading', progress: { files: [{ numPieces: 2, numPiecesPresent: 1 }] } }
+  const state = {
+    playing: { audioSupport: {}, location: 'local', fileIndex: 0, currentTime: 60, isPaused: true },
+    getPlayingTorrentSummary: () => torrent,
+    getPlayingFileSummary: () => ({ path: 'video.mkv' })
+  }
+  const controller = new MediaController(state)
+  let probes = 0
+  let conversions = 0
+  let error
+  controller.mediaError = message => { error = message }
+  native.probeAudio = async () => { probes++; return [{ codec_name: 'ac3' }] }
+  native.convertAudio = async () => { conversions++; return 'file:///cache/compatible.mkv' }
+  try {
+    await controller.checkAudioSupport(true)
+    assert.strictEqual(probes, 0, 'preallocated incomplete downloads are never probed')
+    torrent.progress.files[0].numPiecesPresent = 2
+    await controller.checkAudioSupport()
+    assert.strictEqual(state.playing.audioSupport.url, 'file:///cache/compatible.mkv')
+    assert.strictEqual(state.playing.jumpToTime, 60, 'conversion preserves the playback position')
+    assert(state.playing.isPaused, 'conversion preserves the user pause state')
+    await controller.checkAudioSupport()
+    assert.strictEqual(conversions, 1, 'repeated updates do not reconvert')
+    state.playing.audioSupport = {}
+    native.probeAudio = async () => []
+    await controller.checkAudioSupport(true)
+    assert.strictEqual(conversions, 1, 'silent video does not trigger conversion or fallback')
+    assert(!error)
+    state.playing.audioSupport = {}
+    native.probeAudio = async () => null
+    await controller.checkAudioSupport(true)
+    assert(state.playing.audioSupport.message.includes('FFmpeg'), 'missing tools show actionable help')
+    let finishProbe
+    state.playing.audioSupport = {}
+    native.probeAudio = () => new Promise(resolve => { finishProbe = resolve })
+    const staleProbe = controller.checkAudioSupport(true)
+    state.playing.audioSupport = {}
+    finishProbe([{ codec_name: 'ac3' }])
+    await staleProbe
+    assert.strictEqual(conversions, 1, 'late probe cannot convert a different file')
+    let finishConversion
+    native.probeAudio = async () => [{ codec_name: 'ac3' }]
+    native.convertAudio = () => new Promise(resolve => { finishConversion = resolve })
+    const staleConversion = controller.checkAudioSupport(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    assert(state.playing.audioSupport.converting)
+    state.playing.audioSupport = {}
+    finishConversion('file:///cache/stale.mkv')
+    await staleConversion
+    assert(!state.playing.audioSupport.url, 'late conversion cannot replace a different file')
+    native.cancelAudioConversions = async () => {}
+    const castingConversion = controller.checkAudioSupport(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    state.playing.location = 'chromecast'
+    await controller.checkAudioSupport()
+    finishConversion('file:///cache/casting.mkv')
+    await castingConversion
+    assert(!state.playing.audioSupport.checked, 'casting does not prevent conversion when returning locally')
+    state.playing.location = 'local'
+    native.convertAudio = async () => { throw new Error('conversion failed') }
+    await controller.checkAudioSupport(true)
+    assert(error.includes('conversion failed'), 'conversion failure uses the external-player fallback')
+    assert(!state.playing.audioSupport.converting)
+    return 'Audio controller tests passed: completion gating, resume/pause state, silence, missing tools, stale probes/conversions and failure fallback'
+  } finally {
+    native.probeAudio = originals.probe
+    native.convertAudio = originals.convert
+    native.cancelAudioConversions = originals.cancel
   }
 }
 

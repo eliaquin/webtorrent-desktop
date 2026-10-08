@@ -9,6 +9,7 @@ const sound = require('../lib/sound')
 const TorrentPlayer = require('../lib/torrent-player')
 const TorrentSummary = require('../lib/torrent-summary')
 const Playlist = require('../lib/playlist')
+const native = require('../lib/native-api')
 const State = require('../lib/state')
 
 // Controls playback of torrents and files within torrents
@@ -278,6 +279,10 @@ module.exports = class PlaybackController {
 
     torrentSummary.mostRecentFileIndex = index
 
+    native.cancelAudioConversions().catch(() => {})
+    state.playing.audioSupport = {}
+    state.playing.audioTracks.tracks = []
+
     // update state
     state.playing.infoHash = infoHash
     state.playing.fileIndex = index
@@ -339,6 +344,7 @@ module.exports = class PlaybackController {
 
   closePlayer () {
     console.log('closePlayer')
+    native.cancelAudioConversions().catch(() => {})
 
     // Quit any external players, like Chromecast/Airplay/etc or VLC
     const state = this.state

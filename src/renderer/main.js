@@ -196,6 +196,7 @@ function lazyLoadCast () {
 function update () {
   controllers.playback().showOrHidePlayerControls()
   controllers.subtitles().checkForEmbeddedSubtitles()
+  controllers.media().checkAudioSupport()
   const activity = state.playing.mouseStationarySince
   if (activity !== lastControlsActivity) {
     lastControlsActivity = activity
@@ -292,6 +293,7 @@ const dispatchHandlers = {
   // Local media: <video>, <audio>, external players
   mediaStalled: () => controllers.media().mediaStalled(),
   mediaError: (err) => controllers.media().mediaError(err),
+  checkAudioSupport: missing => controllers.media().checkAudioSupport(missing),
   mediaSuccess: () => controllers.media().mediaSuccess(),
   mediaTimeUpdate: data => controllers.media().mediaTimeUpdate(data),
   mediaVolumeChanged: volume => controllers.media().mediaVolumeChanged(volume),

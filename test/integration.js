@@ -93,6 +93,36 @@ async function main () {
     assert.deepStrictEqual(Buffer.from(await range.arrayBuffer()), fs.readFileSync(video).subarray(0, 16))
     console.log('Integration: sandboxed video playback, seeking, subtitles and byte ranges passed')
 
+    // Exercise detection, native IPC conversion and cached playback in the sandbox.
+    await dispatch('backToList')
+    const ac3 = path.join(downloads, 'unsupported audio.mkv')
+    execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'color=size=160x90:duration=12',
+      '-f', 'lavfi', '-i', 'sine=duration=12', '-c:v', 'libx264', '-c:a', 'ac3', ac3])
+    const ac3Original = fs.readFileSync(ac3)
+    await dispatch('showCreateTorrent', [ac3])
+    const ac3Ready = waitForService('wt-ready')
+    await page.getByRole('button', { name: 'Create Torrent', exact: true }).click()
+    const [, ac3Info] = await ac3Ready
+    await dispatch('playFile', ac3Info.infoHash, 0)
+    await page.waitForFunction(() => {
+      const v = document.querySelector('video')
+      return v?.src.startsWith('file:') && v.audioTracks.length === 1 && v.webkitAudioDecodedByteCount > 0
+    })
+    assert.deepStrictEqual(fs.readFileSync(ac3), ac3Original, 'conversion preserves original torrent data')
+    const cachedURL = await page.evaluate(() => document.querySelector('video').src)
+    const cachedPath = require('url').fileURLToPath(cachedURL)
+    const cachedMtime = fs.statSync(cachedPath).mtimeMs
+    await dispatch('playPause')
+    await page.waitForFunction(() => document.querySelector('video')?.paused)
+    await dispatch('skipTo', 5)
+    await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 5) < 0.2)
+    await dispatch('backToList')
+    await dispatch('playFile', ac3Info.infoHash, 0)
+    await page.waitForFunction(url => document.querySelector('video')?.src === url && document.querySelector('video').audioTracks.length === 1, cachedURL)
+    assert.strictEqual(fs.statSync(cachedPath).mtimeMs, cachedMtime, 'reopening reuses the cached conversion')
+    console.log('Integration: AC-3 detection, sandboxed AAC conversion, seeking, original-data preservation and cache reuse passed')
+    await dispatch('backToList')
+
     const cacheFile = path.join(directory, 'Torrents', info.infoHash + '.torrent')
     for (let i = 0; !fs.existsSync(cacheFile) && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 50))
     assert(fs.existsSync(cacheFile), 'torrent metadata is persisted for resume')

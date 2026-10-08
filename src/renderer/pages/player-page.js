@@ -79,13 +79,13 @@ function syncMedia (state) {
       }
     }
 
-    if (state.playing.isPaused && !mediaElement.paused) {
+    if ((state.playing.isPaused || state.playing.audioSupport.converting) && !mediaElement.paused) {
       mediaElement.pause()
-    } else if (!state.playing.isPaused && mediaElement.paused) {
+    } else if (!state.playing.isPaused && !state.playing.audioSupport.converting && mediaElement.paused) {
       mediaElement.play().catch(err => { if (err.name !== 'AbortError') dispatch('mediaError', err.message) })
     }
     // When the user clicks or drags on the progress bar, jump to that position
-    if (state.playing.jumpToTime != null) {
+    if (state.playing.jumpToTime != null && mediaElement.readyState >= 1) {
       mediaElement.currentTime = state.playing.jumpToTime
       state.playing.jumpToTime = null
     }
@@ -160,7 +160,7 @@ function renderMedia (state) {
   const MediaTagName = state.playing.type
   const mediaTag = (
     <MediaTagName
-      src={Playlist.getCurrentLocalURL(state)}
+      src={state.playing.audioSupport.url || Playlist.getCurrentLocalURL(state)}
       onDoubleClick={dispatcher('toggleFullScreen')}
       onClick={dispatcher('playPause')}
       onLoadedMetadata={onLoadedMetadata}
@@ -184,6 +184,14 @@ function renderMedia (state) {
     >
       {mediaTag}
       {renderOverlay(state)}
+      {state.playing.audioSupport.converting || state.playing.audioSupport.message
+        ? (
+          <div className='audio-conversion-notice' role='status'>
+            {state.playing.audioSupport.converting ? 'Preparing compatible audio…' : state.playing.audioSupport.message}
+            {state.playing.audioSupport.message ? <button onClick={dispatcher('mediaError', 'Audio could not be checked. Install FFmpeg or use an external player.')}>Use external player</button> : null}
+          </div>
+          )
+        : null}
     </div>
   )
 
@@ -195,9 +203,11 @@ function renderMedia (state) {
     if (state.playing.type === 'video') {
       if (mediaElement.videoTracks.length === 0) {
         dispatch('mediaError', 'Video codec unsupported')
+        return
       }
 
-      dispatch('mediaSuccess')
+      if (mediaElement.audioTracks.length === 0) dispatch('checkAudioSupport', true)
+      else dispatch('mediaSuccess')
 
       const dimensions = {
         width: mediaElement.videoWidth,
@@ -405,7 +415,7 @@ function renderAudioMetadata (state) {
 }
 
 function renderLoadingSpinner (state) {
-  if (state.playing.isPaused) return
+  if (state.playing.isPaused || state.playing.audioSupport.converting) return
   const isProbablyStalled = state.playing.isStalled ||
     (new Date().getTime() - state.playing.lastTimeUpdate > 2000)
   if (!isProbablyStalled) return
@@ -987,7 +997,7 @@ function renderPreview (state) {
     >
       <div style={{ width, height, backgroundColor: 'black' }}>
         <video
-          src={Playlist.getCurrentLocalURL(state)}
+          src={state.playing.audioSupport.url || Playlist.getCurrentLocalURL(state)}
           id='preview'
           style={{ border: '1px solid lightgrey', borderRadius: 2 }}
         />

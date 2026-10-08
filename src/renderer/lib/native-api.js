@@ -1,6 +1,9 @@
 const { ipcRenderer } = require('electron')
 
 module.exports = {
+  probeAudio: filepath => ipcRenderer.invoke('native:probe-audio', filepath),
+  convertAudio: filepath => ipcRenderer.invoke('native:convert-audio', filepath),
+  cancelAudioConversions: () => ipcRenderer.invoke('native:cancel-audio-conversions'),
   statPath: filepath => ipcRenderer.invoke('native:stat-path', filepath),
   filesForSeeding: paths => ipcRenderer.invoke('native:files-for-seeding', paths),
   removeTorrentCache: (torrent, poster) => ipcRenderer.invoke('native:remove-torrent-cache', torrent, poster),

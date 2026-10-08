@@ -17,7 +17,7 @@ if (!process.argv.includes('--confirm-profile-reset')) {
     const relative = path.relative(path.resolve(root), path.resolve(candidate))
     return !relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative)
   }
-  for (const name of ['Posters', 'Torrents']) {
+  for (const name of ['Posters', 'Torrents', 'AudioCache']) {
     const target = path.join(config.CONFIG_PATH, name)
     if (downloadPath && (inside(target, downloadPath) || inside(downloadPath, target))) continue
     fs.rmSync(target, { recursive: true, force: true })

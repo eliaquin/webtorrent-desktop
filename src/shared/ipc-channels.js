@@ -10,7 +10,7 @@ exports.send = [
   'wt-start-server', 'wt-stop-server', 'wt-select-files', 'wt-cast-command'
 ]
 exports.invoke = [
-  'native:load-state', 'native:save-state', 'native:stat-path', 'native:files-for-seeding',
+  'native:load-state', 'native:save-state', 'native:probe-audio', 'native:convert-audio', 'native:cancel-audio-conversions', 'native:stat-path', 'native:files-for-seeding',
   'native:remove-torrent-cache', 'native:read-subtitle', 'native:extract-embedded-subtitles',
   'native:choose-path', 'native:choose-subtitles', 'native:save-torrent-as', 'native:subtitle-tools-available', 'native:clipboard-read-text'
 ]
