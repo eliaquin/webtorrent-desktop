@@ -772,6 +772,69 @@ body.drag .app::after {
   margin: 4px;
 }
 
+.player .controls .subtitle-options {
+  width: min(350px, calc(100vw - 32px));
+  max-height: min(480px, 70vh);
+  overflow-y: auto;
+  padding: 10px;
+  background: rgba(30, 30, 30, 0.97);
+}
+
+.subtitle-options button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  padding: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.subtitle-options button:hover,
+.subtitle-options button:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.subtitle-options button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.subtitle-install-help,
+.subtitle-status {
+  padding: 12px 8px 4px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.subtitle-install-help p {
+  margin: 10px 0;
+}
+
+.subtitle-install-help code {
+  display: block;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  user-select: text;
+}
+
+.subtitle-install-help a {
+  color: #7ed6f5;
+}
+
+.subtitle-help-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.subtitle-help-actions button {
+  width: auto;
+}
+
 /**
  * Set the cue text position so it appears above the player controls.
  */

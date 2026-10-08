@@ -6,6 +6,7 @@ module.exports = {
   removeTorrentCache: (torrent, poster) => ipcRenderer.invoke('native:remove-torrent-cache', torrent, poster),
   readSubtitle: filepath => ipcRenderer.invoke('native:read-subtitle', filepath),
   extractEmbeddedSubtitles: filepath => ipcRenderer.invoke('native:extract-embedded-subtitles', filepath),
+  subtitleToolsAvailable: () => ipcRenderer.invoke('native:subtitle-tools-available'),
   loadState: () => ipcRenderer.invoke('native:load-state'),
   saveState: saved => ipcRenderer.invoke('native:save-state', saved),
   windowState: () => ipcRenderer.sendSync('native:window-state'),

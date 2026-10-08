@@ -22,6 +22,80 @@ module.exports = class SubtitlesController {
   toggleSubtitlesMenu () {
     const subtitles = this.state.playing.subtitles
     subtitles.showMenu = !subtitles.showMenu
+    clearTimeout(this.toolsTimer)
+    if (subtitles.showMenu && subtitles.showInstallSteps) this.watchSubtitleTools(subtitles)
+  }
+
+  async findEmbeddedSubtitles () {
+    const subtitles = this.state.playing.subtitles
+    if (subtitles.loadingEmbedded || subtitles.checkingTools) return
+    subtitles.requestedEmbedded = true
+    subtitles.showMenu = true
+    if (subtitles.tracks.some(track => track.embedded)) {
+      subtitles.embeddedMessage = 'Embedded subtitles are ready.'
+      return
+    }
+    await this.checkSubtitleTools()
+  }
+
+  async checkSubtitleTools () {
+    const subtitles = this.state.playing.subtitles
+    if (subtitles.checkingTools) return
+    subtitles.checkingTools = true
+    try {
+      const available = await native.subtitleToolsAvailable()
+      if (this.state.playing.subtitles !== subtitles) return
+      subtitles.toolsAvailable = available
+      if (!available) {
+        subtitles.showInstallNotice = !this.state.saved.prefs.ffmpegNoticeDismissed && !subtitles.showInstallSteps
+        subtitles.embeddedMessage = 'Embedded subtitle discovery needs FFmpeg.'
+        return
+      }
+      clearTimeout(this.toolsTimer)
+      subtitles.showInstallNotice = false
+      subtitles.showInstallSteps = false
+      subtitles.requestedEmbedded = true
+      subtitles.embeddedMessage = 'Subtitles will be checked when this video finishes downloading.'
+      subtitles.checkedEmbedded = false
+      this.checkForEmbeddedSubtitles()
+    } catch (_) {
+      if (this.state.playing.subtitles === subtitles) subtitles.embeddedMessage = 'Could not check for FFmpeg. Try Check again.'
+    } finally {
+      subtitles.checkingTools = false
+    }
+  }
+
+  showInstallSteps () {
+    const subtitles = this.state.playing.subtitles
+    subtitles.showInstallNotice = false
+    subtitles.showInstallSteps = true
+    this.watchSubtitleTools(subtitles)
+  }
+
+  watchSubtitleTools (subtitles) {
+    clearTimeout(this.toolsTimer)
+    const current = () => this.state.playing.subtitles === subtitles && subtitles.showMenu && subtitles.showInstallSteps
+    const check = async () => {
+      if (!current()) return
+      await this.checkSubtitleTools()
+      if (current()) this.toolsTimer = setTimeout(check, 2000)
+    }
+    this.toolsTimer = setTimeout(check, 2000)
+  }
+
+  dismissInstallNotice () {
+    const subtitles = this.state.playing.subtitles
+    subtitles.showInstallNotice = false
+    subtitles.showInstallSteps = false
+    subtitles.embeddedMessage = ''
+    this.state.saved.prefs.ffmpegNoticeDismissed = true
+    clearTimeout(this.toolsTimer)
+    dispatch('stateSave')
+  }
+
+  copyInstallCommand () {
+    native.clipboard.writeText('brew install ffmpeg')
+    this.state.playing.subtitles.commandCopied = true
   }
 
   async addSubtitles (files, autoSelect) {
@@ -82,10 +156,12 @@ module.exports = class SubtitlesController {
     if (progress ? progress.numPiecesPresent !== progress.numPieces : torrent.status !== 'seeding') return
     const filePath = path.join(torrent.path, file.path)
     subtitles.loadingEmbedded = true
+    if (subtitles.requestedEmbedded) subtitles.embeddedMessage = 'Looking for embedded subtitles…'
     native.extractEmbeddedSubtitles(filePath).then(tracks => {
       if (state.playing.subtitles !== subtitles) return // another file is now playing
       subtitles.checkedEmbedded = true
       subtitles.tracks.push(...tracks)
+      if (subtitles.requestedEmbedded) subtitles.embeddedMessage = tracks.length ? 'Embedded subtitles are ready.' : 'No embedded subtitles found in this video.'
       const saved = file.selectedSubtitle
       let selected = tracks.findIndex(track => saved && typeof saved === 'object' && saved.filePath === track.filePath && saved.streamIndex === track.streamIndex)
       if (selected < 0) selected = tracks.findIndex(track => !track.forced && isSystemLanguage(track.language))

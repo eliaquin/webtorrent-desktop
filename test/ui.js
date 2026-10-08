@@ -60,7 +60,8 @@ async function runPlaybackRegressions (projectRoot, directory) {
   const { createStore } = require(projectRoot + '/build/renderer/lib/store')
   const { extractEmbeddedSubtitles } = require(projectRoot + '/build/engine/embedded-subtitles')
   const { readSubtitle } = require(projectRoot + '/build/engine/subtitles')
-  const originals = { send: ipcRenderer.send, statPath: native.statPath, extract: native.extractEmbeddedSubtitles, access: fs.accessSync }
+  const originals = { send: ipcRenderer.send, statPath: native.statPath, extract: native.extractEmbeddedSubtitles, access: fs.accessSync, tools: native.subtitleToolsAvailable, copy: native.clipboard.writeText }
+  let subtitleController
   const events = []
   const commands = []
   const state = createStore({
@@ -135,11 +136,12 @@ async function runPlaybackRegressions (projectRoot, directory) {
     // Simulate either optional tool being absent, regardless of the host PATH.
     const subtitles = { tracks: [], selectedIndex: -1 }
     const playback = {
-      playing: { type: 'video', location: 'local', fileIndex: 0, subtitles },
+      saved: { prefs: {} },
+      playing: { type: 'video', location: 'local', fileIndex: 0, subtitles, isPaused: false },
       getPlayingTorrentSummary: () => ({ path: directory, status: 'seeding' }),
       getPlayingFileSummary: () => torrent.files[0]
     }
-    const subtitleController = new SubtitlesController(playback)
+    subtitleController = new SubtitlesController(playback)
     native.extractEmbeddedSubtitles = extractEmbeddedSubtitles
     events.length = 0
     for (const missing of ['ffmpeg', 'ffprobe', 'both']) {
@@ -157,12 +159,46 @@ async function runPlaybackRegressions (projectRoot, directory) {
     }
     assert.deepStrictEqual(events, [], 'missing optional subtitle tools do not open an error window')
     assert.strictEqual(playback.playing.type, 'video')
-    return 'Playback regression tests passed: unwritten downloads, Resume All, priority, startup, completed data safeguard, stale checks, SRT/VTT readers and missing subtitle tools'
+    fs.accessSync = originals.access
+    let toolsAvailable = false
+    native.subtitleToolsAvailable = async () => toolsAvailable
+    await subtitleController.findEmbeddedSubtitles()
+    assert(playback.playing.subtitles.showInstallNotice, 'only an explicit search shows the optional installation notice')
+    assert.strictEqual(playback.playing.isPaused, false, 'the installation notice keeps video playing')
+    subtitleController.dismissInstallNotice()
+    assert(playback.saved.prefs.ffmpegNoticeDismissed)
+    playback.playing.subtitles = { tracks: [], selectedIndex: -1 }
+    await subtitleController.findEmbeddedSubtitles()
+    assert.strictEqual(playback.playing.subtitles.showInstallNotice, false, 'the full notice stays dismissed for another video')
+    const copied = []
+    native.clipboard.writeText = text => copied.push(text)
+    subtitleController.showInstallSteps()
+    subtitleController.copyInstallCommand()
+    assert.deepStrictEqual(copied, ['brew install ffmpeg'])
+    native.extractEmbeddedSubtitles = async filePath => [{ embedded: true, filePath, streamIndex: 1, language: 'English', label: 'English' }]
+    toolsAvailable = true
+    const deadline = Date.now() + 5000
+    while (!playback.playing.subtitles.tracks.length && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25))
+    assert.strictEqual(playback.playing.subtitles.tracks.length, 1, 'installation is detected and discovery retries automatically')
+    assert.strictEqual(playback.playing.subtitles.showInstallSteps, false)
+    assert.strictEqual(playback.playing.isPaused, false)
+    let finishTools
+    native.subtitleToolsAvailable = () => new Promise(resolve => { finishTools = resolve })
+    playback.playing.subtitles = { tracks: [], selectedIndex: -1 }
+    const stale = subtitleController.findEmbeddedSubtitles()
+    playback.playing.subtitles = { tracks: [], selectedIndex: -1 }
+    finishTools(false)
+    await stale
+    assert(!playback.playing.subtitles.showInstallNotice, 'late availability checks cannot affect another video')
+    return 'Playback regression tests passed: unwritten downloads, stale checks, SRT/VTT readers, optional tools, requested installation notice, remembered dismissal and automatic installation detection'
   } finally {
     ipcRenderer.send = originals.send
     native.statPath = originals.statPath
     native.extractEmbeddedSubtitles = originals.extract
     fs.accessSync = originals.access
+    native.subtitleToolsAvailable = originals.tools
+    native.clipboard.writeText = originals.copy
+    clearTimeout(subtitleController?.toolsTimer)
   }
 }
 
@@ -329,7 +365,31 @@ async function runUI (projectRoot) {
   state.playing.subtitles.tracks = []
   await render(h(App, { store }))
   assert.strictEqual(document.querySelector('.subtitle-control').getAttribute('aria-label'), 'Closed captions')
+  events.length = 0
+  await click(document.querySelector('.subtitle-control'))
+  assert.deepStrictEqual(events.pop(), ['toggleSubtitlesMenu'], 'CC opens the menu even without subtitle tracks')
+  state.playing.subtitles.showMenu = true
+  await render(h(App, { store }))
+  assert(!document.querySelector('.subtitle-install-help'), 'opening CC does not prompt for optional tools')
+  await click(button('Find embedded subtitles'))
+  assert.deepStrictEqual(events.pop(), ['findEmbeddedSubtitles'])
+  state.playing.subtitles.showInstallNotice = true
+  await render(h(App, { store }))
+  assert(document.querySelector('.subtitle-install-help').textContent.includes('You can keep watching without it.'))
+  assert(button('Load subtitle file…'), 'external subtitles remain accessible alongside installation help')
+  await click(button('Not now'))
+  assert.deepStrictEqual(events.pop(), ['dismissSubtitleInstallNotice'])
+  state.playing.subtitles.showInstallNotice = false
+  state.playing.subtitles.showInstallSteps = true
+  await render(h(App, { store }))
+  if (process.platform === 'darwin') {
+    assert.strictEqual(document.querySelector('.subtitle-install-help code').textContent, 'brew install ffmpeg')
+    await click(button('Copy command'))
+    assert.deepStrictEqual(events.pop(), ['copySubtitleInstallCommand'])
+  }
+  await click(button('Check again'))
+  assert.deepStrictEqual(events.pop(), ['checkSubtitleTools'])
   state.location.url = () => 'preferences'
   await render(h(App, { store }))
-  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modal focus/paste/Enter/cancel, scoped store updates, selected subtitle label'
+  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modals, selected subtitle label, empty CC menu, optional installation notice and instructions'
 }

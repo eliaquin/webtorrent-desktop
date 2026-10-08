@@ -84,7 +84,10 @@ function getDefaultPlayState () {
     subtitles: {
       tracks: [], /* subtitle tracks, each {label, language, ...} */
       selectedIndex: -1, /* current subtitle track */
-      showMenu: false /* popover menu, above the video */
+      showMenu: false, /* popover menu, above the video */
+      showInstallNotice: false,
+      showInstallSteps: false,
+      embeddedMessage: ''
     },
     audioTracks: {
       tracks: [],
@@ -117,6 +120,7 @@ function shouldHidePlayerControls () {
     this.playing.mouseStationarySince !== 0 &&
     new Date().getTime() - this.playing.mouseStationarySince > 2000 &&
     !this.playing.mouseInControls &&
+    !this.playing.subtitles.showMenu &&
     !this.playing.isPaused &&
     this.playing.location === 'local'
 }

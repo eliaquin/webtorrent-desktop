@@ -63,6 +63,10 @@ function init () {
   })
   handle('native:read-subtitle', filepath => require('./torrent-service').subtitleTask('text', filepath))
   handle('native:extract-embedded-subtitles', filepath => require('./torrent-service').subtitleTask('embedded', filepath))
+  handle('native:subtitle-tools-available', () => {
+    const { findTool } = require('../engine/embedded-subtitles')
+    return !!(findTool('ffmpeg') && findTool('ffprobe'))
+  })
   handle('native:choose-path', async options => {
     const { filePaths } = await dialog.showOpenDialog(windows.main.win, options)
     return filePaths

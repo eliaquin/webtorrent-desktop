@@ -1,6 +1,7 @@
 /* globals MediaMetadata */
 
 const React = require('react')
+const { shell } = require('electron')
 const BitField = require('bitfield').default
 const prettyBytes = require('prettier-bytes')
 
@@ -550,14 +551,16 @@ function renderCastOptions (state) {
 
 function renderSubtitleOptions (state) {
   const subtitles = state.playing.subtitles
-  if (!subtitles.tracks.length || !subtitles.showMenu) return
+  if (!subtitles.showMenu) return
 
   const items = subtitles.tracks.map((track, ix) => {
     const isSelected = state.playing.subtitles.selectedIndex === ix
     return (
-      <li key={ix} onClick={dispatcher('selectSubtitle', ix)}>
-        <i className='icon'>{'radio_button_' + (isSelected ? 'checked' : 'unchecked')}</i>
-        {track.label}
+      <li key={ix}>
+        <button type='button' onClick={dispatcher('selectSubtitle', ix)}>
+          <i className='icon'>{'radio_button_' + (isSelected ? 'checked' : 'unchecked')}</i>
+          {track.label}
+        </button>
       </li>
     )
   })
@@ -565,13 +568,76 @@ function renderSubtitleOptions (state) {
   const noneSelected = state.playing.subtitles.selectedIndex === -1
   const noneClass = 'radio_button_' + (noneSelected ? 'checked' : 'unchecked')
   return (
-    <ul key='subtitle-options' className='options-list'>
+    <ul key='subtitle-options' className='options-list subtitle-options' aria-label='Subtitle options'>
       {items}
-      <li onClick={dispatcher('selectSubtitle', -1)}>
-        <i className='icon'>{noneClass}</i>
-        None
+      {subtitles.tracks.length > 0 && (
+        <li>
+          <button type='button' onClick={dispatcher('selectSubtitle', -1)}>
+            <i className='icon'>{noneClass}</i>
+            None
+          </button>
+        </li>
+      )}
+      <li>
+        <button type='button' onClick={dispatcher('openSubtitles')}>Load subtitle file…</button>
       </li>
+      <li>
+        <button type='button' disabled={subtitles.loadingEmbedded || subtitles.checkingTools} onClick={dispatcher('findEmbeddedSubtitles')}>
+          Find embedded subtitles
+        </button>
+      </li>
+      {subtitles.showInstallNotice && (
+        <li className='subtitle-install-help'>
+          <strong>Enable embedded subtitles</strong>
+          <p>Install the free FFmpeg tool so WebTorrent can find subtitles stored inside video files. You can keep watching without it.</p>
+          <div className='subtitle-help-actions'>
+            <button type='button' onClick={dispatcher('showSubtitleInstallSteps')}>Show installation steps</button>
+            <button type='button' onClick={dispatcher('dismissSubtitleInstallNotice')}>Not now</button>
+          </div>
+        </li>
+      )}
+      {subtitles.showInstallSteps && renderSubtitleInstallSteps(subtitles)}
+      {!subtitles.showInstallNotice && !subtitles.showInstallSteps && subtitles.embeddedMessage && (
+        <li className='subtitle-status' role='status'>
+          {subtitles.embeddedMessage}
+          {subtitles.toolsAvailable === false && <button type='button' onClick={dispatcher('showSubtitleInstallSteps')}>Show installation steps</button>}
+        </li>
+      )}
     </ul>
+  )
+}
+
+function renderSubtitleInstallSteps (subtitles) {
+  const externalLink = (url, label) => (
+    <a href={url} onClick={event => { event.preventDefault(); shell.openExternal(url) }}>{label}</a>
+  )
+  return (
+    <li className='subtitle-install-help'>
+      <strong>Install FFmpeg</strong>
+      {process.platform === 'darwin'
+        ? (
+          <>
+            <p>If you already have Homebrew, open Terminal and run:</p>
+            <code>brew install ffmpeg</code>
+            <button type='button' onClick={dispatcher('copySubtitleInstallCommand')}>{subtitles.commandCopied ? 'Copied' : 'Copy command'}</button>
+            <p>Need Homebrew? {externalLink('https://brew.sh/', 'Open the setup guide')} first.</p>
+          </>
+          )
+        : (
+          <>
+            <p>{process.platform === 'win32'
+              ? 'Download a Windows build, then add the folder containing ffmpeg.exe and ffprobe.exe to your PATH.'
+              : 'Install the ffmpeg package using your distribution’s package manager.'}
+            </p>
+            <p>{externalLink('https://ffmpeg.org/download.html', 'Open FFmpeg downloads')}</p>
+          </>
+          )}
+      <p>Once installed, WebTorrent will check again automatically while these steps are open.</p>
+      <div className='subtitle-help-actions'>
+        <button type='button' disabled={subtitles.checkingTools} onClick={dispatcher('checkSubtitleTools')}>{subtitles.checkingTools ? 'Checking…' : 'Check again'}</button>
+        <button type='button' onClick={dispatcher('dismissSubtitleInstallNotice')}>Not now</button>
+      </div>
+    </li>
   )
 }
 
@@ -599,11 +665,7 @@ function renderAudioTrackOptions (state) {
 function renderPlayerControls (state) {
   const positionPercent = 100 * state.playing.currentTime / state.playing.duration
   const playbackCursorStyle = { left: 'calc(' + positionPercent + '% - 3px)' }
-  const captionsClass = state.playing.subtitles.tracks.length === 0
-    ? 'disabled'
-    : state.playing.subtitles.selectedIndex >= 0
-      ? 'active'
-      : ''
+  const captionsClass = state.playing.subtitles.selectedIndex >= 0 ? 'active' : ''
   const selectedSubtitle = state.playing.subtitles.tracks[state.playing.subtitles.selectedIndex]
   const multiAudioClass = state.playing.audioTracks.tracks.length > 1
     ? 'active'
@@ -850,8 +912,7 @@ function renderPlayerControls (state) {
   }
 
   function handleSubtitles (e) {
-    if (!state.playing.subtitles.tracks.length || e.ctrlKey || e.metaKey) {
-      // if no subtitles available select it
+    if (e.ctrlKey || e.metaKey) {
       dispatch('openSubtitles')
     } else {
       dispatch('toggleSubtitlesMenu')

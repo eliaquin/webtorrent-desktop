@@ -274,6 +274,11 @@ const dispatchHandlers = {
   openSubtitles: () => controllers.subtitles().openSubtitles(),
   selectSubtitle: (index) => controllers.subtitles().selectSubtitle(index),
   toggleSubtitlesMenu: () => controllers.subtitles().toggleSubtitlesMenu(),
+  findEmbeddedSubtitles: () => controllers.subtitles().findEmbeddedSubtitles(),
+  showSubtitleInstallSteps: () => controllers.subtitles().showInstallSteps(),
+  dismissSubtitleInstallNotice: () => controllers.subtitles().dismissInstallNotice(),
+  checkSubtitleTools: () => controllers.subtitles().checkSubtitleTools(),
+  copySubtitleInstallCommand: () => controllers.subtitles().copyInstallCommand(),
   checkForSubtitles: () => controllers.subtitles().checkForSubtitles(),
   addSubtitles: (files, autoSelect) => controllers.subtitles().addSubtitles(files, autoSelect),
 
@@ -398,6 +403,8 @@ function backToList () {
 function escapeBack () {
   if (state.modal) {
     dispatch('exitModal')
+  } else if (state.playing.subtitles.showMenu) {
+    dispatch('toggleSubtitlesMenu')
   } else if (state.window.isFullScreen) {
     dispatch('toggleFullScreen')
   } else {
