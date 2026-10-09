@@ -11,6 +11,7 @@ module.exports = class PrefsController {
   // Goes to the Preferences screen
   show () {
     const state = this.state
+    if (state.location.url() === 'preferences') return
     state.location.go({
       url: 'preferences',
       setup (cb) {

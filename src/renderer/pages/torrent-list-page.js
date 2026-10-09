@@ -71,7 +71,6 @@ module.exports = class TorrentList extends React.Component {
         <div className='torrent-placeholder'><span>Drop a torrent file anywhere or paste a magnet link</span></div>
         <footer className='shelf-footer'>
           <span>{torrents.length} {torrents.length === 1 ? 'torrent' : 'torrents'} in your library</span>
-          <button type='button' onClick={dispatcher('preferences')}>Preferences</button>
         </footer>
       </section>
     )

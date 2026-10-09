@@ -4,58 +4,34 @@ const { dispatcher } = require('../lib/dispatcher')
 
 class Header extends React.Component {
   render () {
-    const loc = this.props.state.location
+    const page = this.props.state.location.url()
+    const isMainPage = page === 'home' || page === 'preferences'
     return (
-      <div
+      <header
         className='header'
         onMouseMove={dispatcher('mediaMouseMoved')}
         onMouseEnter={dispatcher('mediaControlsMouseEnter')}
         onMouseLeave={dispatcher('mediaControlsMouseLeave')}
-        role='navigation'
       >
-        {this.getTitle()}
-        <div className='nav left float-left'>
-          <button
-            type='button'
-            className={'back ' + (loc.hasBack() ? '' : 'disabled')}
-            title='Back'
-            onClick={dispatcher('back')}
-            disabled={!loc.hasBack()}
-            aria-label='Back'
-          >
-            <i className='icon' aria-hidden='true'>chevron_left</i>
-          </button>
-          <button
-            type='button'
-            className={'forward ' + (loc.hasForward() ? '' : 'disabled')}
-            title='Forward'
-            onClick={dispatcher('forward')}
-            disabled={!loc.hasForward()}
-            aria-label='Forward'
-          >
-            <i className='icon' aria-hidden='true'>chevron_right</i>
-          </button>
-        </div>
-        <div className='nav right float-right'>
-          {this.getSettingsButton()}
-        </div>
-      </div>
-    )
-  }
-
-  getTitle () {
-    if (process.platform !== 'darwin') return null
-    const state = this.props.state
-    return (<div className='title ellipsis'>{state.window.title}</div>)
-  }
-
-  getSettingsButton () {
-    const state = this.props.state
-    if (state.location.url() !== 'home') return null
-    return (
-      <button type='button' className='header-settings' aria-label='Preferences' title='Preferences' onClick={dispatcher('preferences')}>
-        <i className='icon' aria-hidden='true'>settings</i>
-      </button>
+        <nav className='app-navigation' aria-label='Main navigation'>
+          {isMainPage && (
+            <>
+              <button type='button' aria-current={page === 'home' ? 'page' : undefined} onClick={page === 'home' ? undefined : dispatcher('backToList')}>
+                <i className='icon' aria-hidden='true'>video_library</i>Library
+              </button>
+              <button type='button' aria-current={page === 'preferences' ? 'page' : undefined} onClick={page === 'preferences' ? undefined : dispatcher('preferences')}>
+                <i className='icon' aria-hidden='true'>settings</i>Preferences
+              </button>
+            </>
+          )}
+          {!isMainPage && (
+            <button type='button' className='back-to-library' onClick={dispatcher('backToList')}>
+              <i className='icon' aria-hidden='true'>arrow_back</i>Back to library
+            </button>
+          )}
+        </nav>
+        {!isMainPage && <div className='title ellipsis'>{this.props.state.window.title}</div>}
+      </header>
     )
   }
 }

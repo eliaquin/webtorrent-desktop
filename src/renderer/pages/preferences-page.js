@@ -1,8 +1,6 @@
 const { Button, TextField, Checkbox } = require('../components/ui')
 const React = require('react')
 
-const colors = require('../components/ui/colors')
-const Heading = require('../components/heading')
 const PathSelector = require('../components/path-selector')
 
 const { dispatch } = require('../lib/dispatcher')
@@ -53,13 +51,13 @@ class PreferencesPage extends React.Component {
     const availability = this.state.nativePlayer
     return (
       <Preference>
-        <label>
-          Video player{' '}
-          <select aria-label='Video player' value={this.props.state.saved.prefs.videoEngine || 'chromium'} onChange={event => dispatch('updatePreferences', 'videoEngine', event.target.value)}>
+        <div className='preference-select'>
+          <label htmlFor='video-engine'>Video player</label>
+          <select id='video-engine' aria-label='Video player' value={this.props.state.saved.prefs.videoEngine || 'chromium'} onChange={event => dispatch('updatePreferences', 'videoEngine', event.target.value)}>
             <option value='chromium'>Built-in player</option>
             <option value='vlc' disabled={!availability?.available}>Native VLC (experimental)</option>
           </select>
-        </label>
+        </div>
         <p>{availability?.available ? 'Native VLC plays video inside WebTorrent using your installed VLC app. Applies to the next video you open.' : availability?.message || 'Checking for VLC…'}</p>
       </Preference>
     )
@@ -90,8 +88,9 @@ class PreferencesPage extends React.Component {
       <Preference>
         <Checkbox
           className='control'
+          role='switch'
           checked={!this.props.state.saved.prefs.openExternalPlayer}
-          label='Play torrent media files using WebTorrent'
+          label='Play media in WebTorrent'
           onChange={this.handleOpenExternalPlayerChange}
         />
       </Preference>
@@ -108,11 +107,12 @@ class PreferencesPage extends React.Component {
       <Preference>
         <Checkbox
           className='control'
+          role='switch'
           checked={this.props.state.saved.prefs.highestPlaybackPriority}
-          label='Highest Playback Priority'
+          label='Prioritize streaming'
           onChange={this.handleHighestPlaybackPriorityChange}
         />
-        <p>Pauses all active torrents to allow playback to use all of the available bandwidth.</p>
+        <p>Pause other active torrents while you watch to give playback all available bandwidth.</p>
       </Preference>
     )
   }
@@ -132,7 +132,6 @@ class PreferencesPage extends React.Component {
 
     return (
       <Preference>
-        <p>{description}</p>
         <PathSelector
           dialog={{
             title: 'Select media player app',
@@ -142,6 +141,7 @@ class PreferencesPage extends React.Component {
           title='External player'
           value={playerPath}
         />
+        <p>{description}</p>
       </Preference>
     )
   }
@@ -155,10 +155,12 @@ class PreferencesPage extends React.Component {
       <Preference>
         <Checkbox
           className='control'
+          role='switch'
           checked={this.props.state.saved.prefs.autoAddTorrents}
-          label='Watch for new .torrent files and add them immediately'
+          label='Automatically add torrents'
           onChange={(e) => { this.handleAutoAddTorrentsChange(e) }}
         />
+        <p>Add new .torrent files from your watched folder to the library.</p>
       </Preference>
     )
   }
@@ -209,13 +211,15 @@ class PreferencesPage extends React.Component {
     if (isFileHandler) {
       return (
         <Preference>
-          <p>WebTorrent is your default torrent app. Hooray!</p>
+          <div className='preference-label'>Default torrent app</div>
+          <p className='preference-status'><i className='icon' aria-hidden='true'>check_circle</i>WebTorrent is your default torrent app.</p>
         </Preference>
       )
     }
     return (
       <Preference>
-        <p>WebTorrent is not currently the default torrent app.</p>
+        <div className='preference-label'>Default torrent app</div>
+        <p>Open torrent files and magnet links with WebTorrent by default.</p>
         <Button
           className='control'
           onClick={this.handleSetDefaultApp}
@@ -239,6 +243,7 @@ class PreferencesPage extends React.Component {
       <Preference>
         <Checkbox
           className='control'
+          role='switch'
           checked={this.props.state.saved.prefs.startup}
           label='Open WebTorrent on startup'
           onChange={this.handleStartupChange}
@@ -252,6 +257,7 @@ class PreferencesPage extends React.Component {
       <Preference>
         <Checkbox
           className='control'
+          role='switch'
           checked={this.props.state.saved.prefs.soundNotifications}
           label='Enable sounds'
           onChange={this.handleSoundNotificationsChange}
@@ -270,19 +276,18 @@ class PreferencesPage extends React.Component {
   }
 
   setGlobalTrackers () {
-    // Align the text fields
-    const textFieldStyle = { width: '100%' }
-    const textareaStyle = { margin: 0 }
-
     return (
       <Preference>
+        <label className='preference-label' htmlFor='global-trackers'>Global trackers</label>
+        <p id='trackers-description'>Add one tracker URL per line. These trackers are used for every torrent.</p>
         <TextField
           className='torrent-trackers control'
           aria-label='Global trackers'
-          style={textFieldStyle}
-          textareaStyle={textareaStyle}
+          id='global-trackers'
+          aria-describedby='trackers-description'
+          fullWidth
           multiline
-          rows={2}
+          rows={4}
           rowsMax={10}
           value={this.state.globalTrackers}
           onChange={this.handleSetGlobalTrackers}
@@ -305,60 +310,59 @@ class PreferencesPage extends React.Component {
   }
 
   render () {
-    const style = {
-      color: colors.grey400,
-      marginLeft: 25,
-      marginRight: 25
-    }
+    const sections = [
+      { id: 'folders', title: 'Folders', icon: 'folder_open', description: 'Choose where your downloads live and how torrents are added.', contents: <>{this.downloadPathSelector()}{this.torrentsFolderPathSelector()}{this.autoAddTorrentsCheckbox()}</> },
+      { id: 'playback', title: 'Playback', icon: 'play_circle_outline', description: 'Make yourself comfortable. Choose how your media plays.', contents: <>{this.openExternalPlayerCheckbox()}{this.videoEngineSelector()}{this.externalPlayerPathSelector()}{this.highestPlaybackPriorityCheckbox()}</> },
+      { id: 'general', title: 'General', icon: 'tune', description: 'A few everyday details, just the way you like them.', contents: <>{this.setStartupCheckbox()}{this.soundNotificationsCheckbox()}{this.setDefaultAppButton()}</> },
+      { id: 'trackers', title: 'Trackers', icon: 'wifi', description: 'Help your torrents find peers on the network.', contents: this.setGlobalTrackers() }
+    ]
     return (
-      <div style={style}>
-        <PreferencesSection title='Folders'>
-          {this.downloadPathSelector()}
-          {this.autoAddTorrentsCheckbox()}
-          {this.torrentsFolderPathSelector()}
-        </PreferencesSection>
-        <PreferencesSection title='Playback'>
-          {this.openExternalPlayerCheckbox()}
-          {this.videoEngineSelector()}
-          {this.externalPlayerPathSelector()}
-          {this.highestPlaybackPriorityCheckbox()}
-        </PreferencesSection>
-        <PreferencesSection title='Default torrent app'>
-          {this.setDefaultAppButton()}
-        </PreferencesSection>
-        <PreferencesSection title='General'>
-          {this.setStartupCheckbox()}
-          {this.soundNotificationsCheckbox()}
-        </PreferencesSection>
-        <PreferencesSection title='Trackers'>
-          {this.setGlobalTrackers()}
-        </PreferencesSection>
-      </div>
+      <section className='preferences-page' aria-labelledby='preferences-title'>
+        <div className='preferences-heading'>
+          <div><h1 id='preferences-title'>Preferences</h1><p>Make WebTorrent feel like home.</p></div>
+          <span className='preferences-autosave'><i className='icon' aria-hidden='true'>check_circle</i>Changes save automatically</span>
+        </div>
+        <div className='preferences-layout'>
+          <nav className='preferences-index' aria-label='Preference sections'>
+            {sections.map(section => (
+              <button
+                type='button' key={section.id} onClick={() => {
+                  const heading = document.getElementById('preferences-' + section.id)
+                  heading.focus({ preventScroll: true })
+                  heading.scrollIntoView({ block: 'start' })
+                }}
+              >
+                <i className='icon' aria-hidden='true'>{section.icon}</i>{section.title}
+              </button>
+            ))}
+          </nav>
+          <div className='preferences-sections'>
+            {sections.map(section => (
+              <PreferencesSection key={section.id} id={'preferences-' + section.id} title={section.title} description={section.description}>
+                {section.contents}
+              </PreferencesSection>
+            ))}
+          </div>
+        </div>
+      </section>
     )
   }
 }
 
-/** @extends {React.Component<{title?: string, children?: import('react').ReactNode}>} */
-class PreferencesSection extends React.Component {
-  render () {
-    const style = {
-      marginBottom: 25,
-      marginTop: 25
-    }
-    return (
-      <div style={style}>
-        <Heading level={2}>{this.props.title}</Heading>
-        {this.props.children}
+function PreferencesSection ({ id, title, description, children }) {
+  return (
+    <section className='preferences-section' aria-labelledby={id}>
+      <div className='preferences-section-heading'>
+        <h2 id={id} tabIndex={-1}>{title}</h2>
+        <p>{description}</p>
       </div>
-    )
-  }
+      <div className='preferences-card'>{children}</div>
+    </section>
+  )
 }
 
-class Preference extends React.Component {
-  render () {
-    const style = { marginBottom: 10 }
-    return (<div style={style}>{this.props.children}</div>)
-  }
+function Preference ({ children }) {
+  return <div className='preference'>{children}</div>
 }
 
 module.exports = PreferencesPage

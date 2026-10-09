@@ -470,6 +470,18 @@ async function runUI (projectRoot) {
   const state = store.state
   events.length = 0
   await render(h(App, { store }))
+  const mainNav = document.querySelector('[aria-label="Main navigation"]')
+  assert.strictEqual(mainNav.querySelector('[aria-current="page"]').textContent, 'settingsPreferences')
+  await click(mainNav.querySelector('[aria-current="page"]'))
+  assert.deepStrictEqual(events, [], 'selecting the current destination does not add history')
+  await click(mainNav.querySelector('button'))
+  assert.deepStrictEqual(events.pop(), ['backToList'], 'Library returns directly to the torrent list')
+  assert(!document.querySelector('.header .back, .header .forward'), 'main navigation uses explicit destinations')
+  const trackersShortcut = [...document.querySelectorAll('.preferences-index button')].find(el => el.textContent.endsWith('Trackers'))
+  await click(trackersShortcut)
+  assert.strictEqual(document.activeElement.id, 'preferences-trackers', 'section shortcuts move keyboard focus to their destination')
+  assert(document.querySelector('.content').scrollTop > 0, 'section shortcuts scroll the settings into view')
+  document.querySelector('.content').scrollTop = 0
   const sounds = [...document.querySelectorAll('.ui-checkbox')].find(el => el.textContent === 'Enable sounds')
   await click(sounds)
   assert.deepStrictEqual(events.pop(), ['updatePreferences', 'soundNotifications', true])
@@ -487,9 +499,29 @@ async function runUI (projectRoot) {
   await render(h(App, { store }))
   assert(sounds.querySelector('input').checked, 'store subscriptions update preferences')
 
+  // Folder selection still uses the native picker and dispatches the selected path.
+  const native = require(projectRoot + '/build/renderer/lib/native-api')
+  const choosePath = native.choosePath
+  try {
+    native.choosePath = async options => {
+      assert.deepStrictEqual(options.properties, ['openDirectory'])
+      return ['/tmp/new-downloads']
+    }
+    await click(document.querySelector('[aria-label="Change download location"]'))
+    assert.deepStrictEqual(events.pop(), ['updatePreferences', 'downloadPath', '/tmp/new-downloads'])
+    native.choosePath = async () => undefined
+    events.length = 0
+    await click(document.querySelector('[aria-label="Change download location"]'))
+    assert.deepStrictEqual(events, [], 'cancelling the picker preserves the download path')
+  } finally {
+    native.choosePath = choosePath
+  }
+
   state.location.url = () => 'create-torrent'
   state.location.current = () => ({ files: [{ name: 'seed.bin', path: '/tmp/seed.bin', size: 128 }] })
   await render(h(App, { store }))
+  await click(document.querySelector('.back-to-library'))
+  assert.deepStrictEqual(events.pop(), ['backToList'], 'torrent creation has an explicit return to the library')
   await click(button('Show advanced settings...'))
   await click(document.querySelector('.torrent-is-private input'))
   await type(document.querySelector('[aria-label="Trackers"]'), 'https://tracker.example/announce')
@@ -505,6 +537,10 @@ async function runUI (projectRoot) {
   state.saved.torrents = [{ torrentKey: 1, infoHash: 'abc', name: 'Example download', status: 'downloading', files: [], progress: { progress: 0.5, downloaded: 128, length: 256, numPeers: 0, downloadSpeed: 0, uploadSpeed: 0, ready: true } }]
   await render(h(App, { store }))
   events.length = 0
+  assert.strictEqual(document.querySelector('.app-navigation [aria-current="page"]').textContent, 'video_libraryLibrary')
+  assert(!document.querySelector('.shelf-footer button'), 'the library footer has no redundant Preferences link')
+  await click([...document.querySelectorAll('.app-navigation button')].find(el => el.textContent.endsWith('Preferences')))
+  assert.deepStrictEqual(events.pop(), ['preferences'], 'Preferences is reachable from the main navigation')
   await click(document.querySelector('.download'))
   assert.deepStrictEqual(events, [['toggleTorrent', 'abc']], 'download control does not select the torrent row')
   assert.strictEqual(document.querySelector('progress').value, 50)
