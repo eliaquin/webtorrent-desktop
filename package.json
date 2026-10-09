@@ -1,7 +1,7 @@
 {
   "name": "webtorrent-desktop",
   "description": "WebTorrent, the streaming torrent client. For Mac, Windows, and Linux.",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "author": {
     "name": "WebTorrent, LLC",
     "email": "feross@webtorrent.io",
@@ -43,6 +43,7 @@
     "electron-winstaller": "5.4.4",
     "esbuild": "0.28.2",
     "minimist": "1.2.8",
+    "node-api-headers": "1.9.0",
     "open": "8.4.2",
     "playwright": "1.64.0",
     "plist": "3.1.1",
@@ -94,7 +95,9 @@
     "reset-app": "node bin/reset.js",
     "test-store": "node test/store.js",
     "test-torrent": "node test/torrent.js",
-    "test-all": "npm test && npm run test-cleanup && npm run test-store && npm run test-torrent && npm run test-security && npm run test-ui && npm run test-subtitles && npm run test-audio && npm run test-integration && npm run audit",
+    "test-native-player": "node test/native-player.js",
+    "test-native-integration": "npm run build && node test/native-player-integration.js",
+    "test-all": "npm test && npm run test-cleanup && npm run test-store && npm run test-torrent && npm run test-native-player && npm run test-security && npm run test-ui && npm run test-subtitles && npm run test-audio && npm run test-integration && npm run audit",
     "release": "node bin/release.js",
     "checksums": "node bin/checksums.js",
     "test-cleanup": "node test/cleanup.js"

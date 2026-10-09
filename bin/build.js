@@ -16,6 +16,7 @@ function build (directory) {
 
 fs.rmSync('build', { recursive: true, force: true })
 build('src')
+require('./build-native')()
 console.log('Build complete')
 
 async function bundle () {

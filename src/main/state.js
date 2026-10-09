@@ -19,6 +19,7 @@ async function setupStateSaved () {
       downloadPath: config.DEFAULT_DOWNLOAD_PATH,
       isFileHandler: false,
       openExternalPlayer: false,
+      videoEngine: 'chromium',
       externalPlayerPath: '',
       startup: false,
       soundNotifications: true,

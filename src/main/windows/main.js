@@ -32,6 +32,8 @@ function init (state, options) {
 
   const win = main.win = new BrowserWindow({
     backgroundColor: '#282828',
+    // Native video sits below the web controls. Other views paint opaque CSS.
+    transparent: process.platform === 'darwin',
     darkTheme: true, // Forces dark theme (GTK+3)
     height: initialBounds.height,
     icon: getIconPath(), // Window icon (Windows, Linux)
@@ -54,6 +56,8 @@ function init (state, options) {
     y: initialBounds.y
   })
   secureWindow(win)
+  win.webContents.on('render-process-gone', () => require('../native-player').getPlayer().close().catch(() => {}))
+  win.once('closed', () => require('../native-player').getPlayer().close().catch(() => {}))
 
   // Handle Escape once, including when a dialog's text field has focus. This
   // also prevents the menu accelerator from handling the same key twice.

@@ -31,6 +31,32 @@ Homebrew's `webtorrent` cask installs the upstream project, not this personal fo
 Embedded subtitle extraction and video posters use system FFmpeg. On macOS,
 install it with `brew install ffmpeg`.
 
+### Optional native video player (macOS, experimental)
+
+Both video players are available. The built-in Chromium player remains the default.
+To try libVLC **inside the WebTorrent window**, install VLC 3 in Applications before
+building, then choose **Preferences → Playback → Video player → Native VLC
+(experimental)**. The setting is saved and applies to the next video you open.
+It is independent of the option to open media in an external app.
+
+Native playback uses VLC's decoders and video output directly, including torrent
+HTTP streaming, embedded/loaded subtitles, audio tracks, seeking, volume and speed.
+No compatible copy or audio conversion is needed. If the native player cannot
+start, WebTorrent displays the reason and uses the built-in player for that video.
+Seek previews show the time; thumbnail previews remain available in the built-in player.
+
+The first native implementation supports macOS 13+ with a matching arm64 or x64
+VLC 3 installation. VLC's libraries/plugins are loaded from VLC.app and are not
+bundled; keep VLC installed. Windows and Linux continue to use the existing players.
+Building the optional bridge needs Apple's command line tools (`clang++`); `npm run
+build` compiles it using Node-API headers and VLC's installed SDK headers. A custom
+VLC runtime can be supplied through `WEBTORRENT_VLC_PATH` (the `Contents/MacOS`
+directory). Native modules are unpacked when packaging the Electron application.
+
+Run `npm run test-native-player` for session/authorization checks and `npm run
+test-native-integration` on a Mac with VLC and FFmpeg for actual torrent playback,
+controls, subtitles, fullscreen and teardown checks.
+
 ## How to Contribute
 
 ### Get the code

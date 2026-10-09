@@ -7,6 +7,10 @@ module.exports = class AudioTracksController {
 
   selectAudioTrack (ix) {
     this.state.playing.audioTracks.selectedIndex = ix
+    if (this.state.playing.engine === 'vlc') {
+      this.state.playing.audioTracks.userSelected = true
+      return
+    }
     dispatch('skip', 0.2) // HACK: hardcoded seek value for smooth audio change
   }
 

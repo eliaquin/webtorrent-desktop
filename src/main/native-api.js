@@ -63,6 +63,16 @@ function init () {
     }
   })
   const audio = require('../engine/audio-support')
+  const player = require('./native-player').getPlayer()
+  require('./torrent-service').events.on('wt-server-running', stream => { player.stream = stream })
+  handle('native:player-available', () => player.availability())
+  handle('native:player-open', options => player.open(options))
+  handle('native:player-command', (sessionId, command, value) => player.command(sessionId, command, value))
+  handle('native:player-bounds', (sessionId, rect) => player.bounds(sessionId, rect))
+  handle('native:player-close', sessionId => {
+    if (typeof sessionId !== 'string' || !sessionId) throw new Error('Invalid native playback session')
+    return player.close(sessionId)
+  })
   require('electron').app.once('will-quit', audio.cancelConversions)
   handle('native:probe-audio', filepath => audio.probeAudio(filepath))
   handle('native:convert-audio', filepath => audio.convertAudio(filepath, path.join(config.CONFIG_PATH, 'AudioCache')))

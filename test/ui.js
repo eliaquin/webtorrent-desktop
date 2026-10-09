@@ -2,7 +2,8 @@
 
 // Exercise the React UI in Electron's real DOM without a WebDriver dependency.
 process.env.NODE_ENV = 'test'
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
+ipcMain.handle('native:player-available', () => ({ available: true }))
 const fs = require('fs')
 const os = require('os')
 const path = require('path')

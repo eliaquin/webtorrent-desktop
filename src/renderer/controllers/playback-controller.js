@@ -293,6 +293,15 @@ module.exports = class PlaybackController {
         ? 'audio'
         : 'other'
 
+    const wasNative = state.playing.engine === 'vlc'
+    state.playing.engine = state.playing.type === 'video' && state.saved.prefs.videoEngine === 'vlc' && process.platform === 'darwin' ? 'vlc' : 'chromium'
+    state.playing.nativeSession = null
+    state.playing.nativeError = null
+    if (wasNative || state.playing.engine === 'vlc') {
+      state.playing.subtitles = State.getDefaultPlayState().subtitles
+      state.playing.audioTracks.userSelected = false
+    }
+
     // pick up where we left off
     let jumpToTime = 0
     if (resume && fileSummary.currentTime) {

@@ -7,6 +7,7 @@ const PathSelector = require('../components/path-selector')
 
 const { dispatch } = require('../lib/dispatcher')
 const config = require('../../config')
+const native = require('../lib/native-api')
 
 class PreferencesPage extends React.Component {
   constructor (props) {
@@ -33,8 +34,35 @@ class PreferencesPage extends React.Component {
     const globalTrackers = this.props.state.getGlobalTrackers().join('\n')
 
     this.state = {
-      globalTrackers
+      globalTrackers,
+      nativePlayer: null
     }
+  }
+
+  componentDidMount () {
+    this.mounted = true
+    native.playerAvailable().then(nativePlayer => { if (this.mounted) this.setState({ nativePlayer }) }).catch(() => {
+      if (this.mounted) this.setState({ nativePlayer: { available: false, message: 'Native VLC is unavailable.' } })
+    })
+  }
+
+  componentWillUnmount () { this.mounted = false }
+
+  videoEngineSelector () {
+    if (process.platform !== 'darwin') return
+    const availability = this.state.nativePlayer
+    return (
+      <Preference>
+        <label>
+          Video player{' '}
+          <select aria-label='Video player' value={this.props.state.saved.prefs.videoEngine || 'chromium'} onChange={event => dispatch('updatePreferences', 'videoEngine', event.target.value)}>
+            <option value='chromium'>Built-in player</option>
+            <option value='vlc' disabled={!availability?.available}>Native VLC (experimental)</option>
+          </select>
+        </label>
+        <p>{availability?.available ? 'Native VLC plays video inside WebTorrent using your installed VLC app. Applies to the next video you open.' : availability?.message || 'Checking for VLC…'}</p>
+      </Preference>
+    )
   }
 
   downloadPathSelector () {
@@ -291,6 +319,7 @@ class PreferencesPage extends React.Component {
         </PreferencesSection>
         <PreferencesSection title='Playback'>
           {this.openExternalPlayerCheckbox()}
+          {this.videoEngineSelector()}
           {this.externalPlayerPathSelector()}
           {this.highestPlaybackPriorityCheckbox()}
         </PreferencesSection>

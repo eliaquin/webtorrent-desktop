@@ -72,6 +72,8 @@ function getDefaultPlayState () {
     fileName: null, /* name of the file that is playing */
     location: 'local', /* 'local', 'chromecast', 'airplay' */
     type: null, /* 'audio' or 'video', could be 'other' if ever support eg streaming to VLC */
+    engine: 'chromium',
+    nativeSession: null,
     currentTime: 0, /* seconds */
     duration: 1, /* seconds */
     isReady: false,

@@ -438,6 +438,26 @@ body.drag .media-shelf { outline: 2px dashed var(--shelf-accent); outline-offset
   width: 100%;
 }
 
+/* Cocoa draws native video below Electron's transparent controls. */
+html:has(.app.native-video),
+body:has(.app.native-video),
+.app.native-video,
+.app.native-video .player,
+.app.native-video .letterbox {
+  background: transparent;
+}
+.native-video-surface {
+  position: absolute;
+  inset: 0;
+}
+.native-seek-preview {
+  position: absolute;
+  bottom: 50px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
+}
+
 .player .name {
   font-size: 20px;
   font-weight: bold;

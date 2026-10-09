@@ -34,6 +34,9 @@ function init () {
   worker.on('exit', code => {
     ready = false
     worker = null
+    const player = require('./native-player').getPlayer()
+    player.stream = null
+    player.close().catch(() => {})
     if (!app.isQuitting) windows.main.send('wt-error', null, 'Torrent service stopped (exit ' + code + '). Restart the app to reconnect.')
   })
   app.once('will-quit', () => { if (worker) worker.kill() })
@@ -41,6 +44,7 @@ function init () {
 
 function send (name, ...args) {
   if (!commands.has(name)) return
+  if (name === 'wt-stop-server') require('./native-player').getPlayer().stream = null
   if (ready && worker) worker.postMessage({ name, args })
   else queued.push({ name, args })
 }

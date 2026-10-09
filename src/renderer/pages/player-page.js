@@ -9,6 +9,7 @@ const TorrentSummary = require('../lib/torrent-summary')
 const Playlist = require('../lib/playlist')
 const { dispatch, dispatcher } = require('../lib/dispatcher')
 const { calculateEta } = require('../lib/time')
+const NativeMedia = require('../components/native-media')
 
 // Shows a streaming video player. Standard features + Chromecast + Airplay
 module.exports = class Player extends React.Component {
@@ -37,10 +38,11 @@ module.exports = class Player extends React.Component {
   componentWillUnmount () {
     // Unload the media element so that Chromium stops trying to fetch data
     const tag = document.querySelector('audio,video')
-    if (!tag) return
-    tag.pause()
-    tag.src = ''
-    tag.load()
+    if (tag) {
+      tag.pause()
+      tag.src = ''
+      tag.load()
+    }
     navigator.mediaSession.metadata = null
   }
 }
@@ -51,6 +53,7 @@ function handleVolumeWheel (e) {
 }
 
 function syncMedia (state) {
+  if (state.playing.engine === 'vlc') return
   if (!state.server) return
   // Unfortunately, play/pause can't be done just by modifying HTML.
   // Instead, grab the DOM node and play/pause it if necessary
@@ -138,6 +141,14 @@ function syncMedia (state) {
 
 function renderMedia (state) {
   if (!state.server) return
+  if (state.playing.engine === 'vlc') {
+    return (
+      <div className='letterbox'>
+        <NativeMedia key={state.playing.infoHash + ':' + state.playing.fileIndex} state={state} />
+        {renderOverlay(state)}
+      </div>
+    )
+  }
 
   // Add subtitles to the <video> tag
   const trackTags = []
@@ -192,6 +203,7 @@ function renderMedia (state) {
           </div>
           )
         : null}
+      {state.playing.nativeError && <div className='audio-conversion-notice' role='status'>{state.playing.nativeError}</div>}
     </div>
   )
 
@@ -592,7 +604,7 @@ function renderSubtitleOptions (state) {
       <li>
         <button type='button' onClick={dispatcher('openSubtitles')}>Load subtitle file…</button>
       </li>
-      {!hasEmbeddedSubtitles && (
+      {!hasEmbeddedSubtitles && state.playing.engine !== 'vlc' && (
         <li>
           <button type='button' disabled={subtitles.loadingEmbedded || subtitles.checkingTools} onClick={dispatcher('findEmbeddedSubtitles')}>
             Find embedded subtitles
@@ -970,6 +982,14 @@ function renderPreview (state) {
   const windowWidth = document.querySelector('body').clientWidth
   const fraction = previewXCoord / windowWidth
   const time = fraction * state.playing.duration /* seconds */
+  if (state.playing.engine === 'vlc') {
+    if (previewXCoord == null) return null
+    return (
+      <div key='preview' className='native-seek-preview' style={{ left: Math.min(Math.max(previewXCoord - 25, 5), windowWidth - 55) }}>
+        {formatTime(time, state.playing.duration)}
+      </div>
+    )
+  }
 
   const height = 70
   let width = 0

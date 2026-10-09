@@ -1,6 +1,11 @@
 const { ipcRenderer } = require('electron')
 
 module.exports = {
+  playerAvailable: () => ipcRenderer.invoke('native:player-available'),
+  openPlayer: options => ipcRenderer.invoke('native:player-open', options),
+  playerCommand: (sessionId, command, value) => ipcRenderer.invoke('native:player-command', sessionId, command, value),
+  playerBounds: (sessionId, rect) => ipcRenderer.invoke('native:player-bounds', sessionId, rect),
+  closePlayer: sessionId => ipcRenderer.invoke('native:player-close', sessionId),
   probeAudio: filepath => ipcRenderer.invoke('native:probe-audio', filepath),
   convertAudio: filepath => ipcRenderer.invoke('native:convert-audio', filepath),
   cancelAudioConversions: () => ipcRenderer.invoke('native:cancel-audio-conversions'),

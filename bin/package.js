@@ -44,7 +44,7 @@ function build () {
   removeDirectory(BUILD_PATH)
 
   console.log('Build: Compiling Node modules, browser UI and sandboxed preloads...')
-  cp.execSync('npm run build', { NODE_ENV: 'production', stdio: 'inherit' })
+  cp.execSync('npm run build', { env: { ...process.env, NODE_ENV: 'production', WEBTORRENT_NATIVE_ARCH: argv.arch || process.arch }, stdio: 'inherit' })
   console.log('Build: Compiled application.')
 
   const platform = argv._[0]
@@ -80,7 +80,7 @@ const all = {
   asar: {
     // A glob expression, that unpacks the files with matching names to the
     // "app.asar.unpacked" directory.
-    unpack: 'WebTorrent*'
+    unpack: '{WebTorrent*,**/*.node}'
   },
 
   // The build version of the application. Maps to the FileVersion metadata property on
@@ -93,7 +93,7 @@ const all = {
 
   // Pattern which specifies which files to ignore when copying files to create the
   // package(s).
-  ignore: /^\/src|^\/dist|\/(appveyor.yml|\.appveyor.yml|\.github|appdmg|AUTHORS|CONTRIBUTORS|bench|benchmark|benchmark\.js|bin|bower\.json|component\.json|coverage|doc|docs|docs\.mli|dragdrop\.min\.js|example|examples|example\.html|example\.js|externs|ipaddr\.min\.js|Makefile|min|minimist|perf|rusha|simplepeer\.min\.js|simplewebsocket\.min\.js|static\/screenshot\.png|test|tests|test\.js|tests\.js|webtorrent\.min\.js|\.[^/]*|.*\.md|.*\.markdown)$/,
+  ignore: /^\/src|^\/native|^\/dist|\/(appveyor.yml|\.appveyor.yml|\.github|appdmg|AUTHORS|CONTRIBUTORS|bench|benchmark|benchmark\.js|bin|bower\.json|component\.json|coverage|doc|docs|docs\.mli|dragdrop\.min\.js|example|examples|example\.html|example\.js|externs|ipaddr\.min\.js|Makefile|min|minimist|perf|rusha|simplepeer\.min\.js|simplewebsocket\.min\.js|static\/screenshot\.png|test|tests|test\.js|tests\.js|webtorrent\.min\.js|\.[^/]*|.*\.md|.*\.markdown)$/,
 
   // The application name.
   name: config.APP_NAME,
@@ -280,13 +280,19 @@ function buildDarwin (cb) {
        *   - Xcode Command Line Tools (xcode-select --install)
        *   - Membership in the Apple Developer Program
        */
+      const hasNativePlayer = ['arm64', 'x64'].some(arch => fs.existsSync(path.join(appPath, 'Contents/Resources/app.asar.unpacked/build/native', `vlc-${arch}.node`)))
       const signOpts = {
         app: appPath,
         platform: 'darwin',
         identity: process.env.APPLE_SIGNING_IDENTITY,
-        optionsForFile: () => ({
+        optionsForFile: filePath => ({
           hardenedRuntime: true,
-          entitlements: path.join(config.ROOT_PATH, 'bin', 'darwin-entitlements.plist')
+          // Only the main app may load another team's VLC plugins. Renderer and
+          // networking helpers retain the original library validation policy.
+          entitlements: path.join(config.ROOT_PATH, 'bin', hasNativePlayer &&
+            [appPath, path.join(appPath, 'Contents/MacOS', config.APP_NAME)].includes(filePath)
+            ? 'darwin-native-player-entitlements.plist'
+            : 'darwin-entitlements.plist')
         })
       }
       const notarizeOpts = {

@@ -13,6 +13,7 @@ module.exports = class MediaController {
 
   async checkAudioSupport (missing) {
     const state = this.state
+    if (state.playing.engine === 'vlc') return
     const support = state.playing.audioSupport
     if (missing) support.missing = true
     if (state.playing.location !== 'local') {

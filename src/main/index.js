@@ -120,7 +120,7 @@ function init () {
     app.isQuitting = true
     e.preventDefault()
     windows.main.dispatch('stateSaveImmediate') // try to save state on exit
-    ipcMain.once('stateSaved', () => app.quit())
+    ipcMain.once('stateSaved', () => require('./native-player').getPlayer().close().catch(log.error).finally(() => app.quit()))
     setTimeout(() => {
       console.error('Saving state took too long. Quitting.')
       app.quit()

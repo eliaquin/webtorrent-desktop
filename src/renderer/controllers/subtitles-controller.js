@@ -17,6 +17,7 @@ module.exports = class SubtitlesController {
   selectSubtitle (ix) {
     this.state.playing.subtitles.selectedIndex = ix
     this.state.playing.subtitles.userSelected = true
+    this.state.playing.subtitles.persistNativeSelection = false
   }
 
   toggleSubtitlesMenu () {
@@ -103,6 +104,17 @@ module.exports = class SubtitlesController {
     if (this.state.playing.type !== 'video') return
     if (files.length === 0) return
     const subtitles = this.state.playing.subtitles
+    if (this.state.playing.engine === 'vlc') {
+      const existing = subtitles.nativeFiles || []
+      const added = files.map(file => file.path || file).filter(filepath => !existing.some(file => file.path === filepath))
+      if (!added.length) return
+      subtitles.nativeFiles = [...existing, ...added.map(path => ({ path, select: !!autoSelect }))]
+      if (autoSelect) {
+        subtitles.userSelected = false // VLC selects the loaded slave once ready.
+        subtitles.persistNativeSelection = true
+      }
+      return
+    }
 
     try {
       const tracks = await Promise.all(files.map(file => native.readSubtitle(file.path || file)))
@@ -145,6 +157,7 @@ module.exports = class SubtitlesController {
 
   checkForEmbeddedSubtitles () {
     const state = this.state
+    if (state.playing.engine === 'vlc') return
     if (state.playing.type !== 'video' || state.playing.location !== 'local') return
     const subtitles = state.playing.subtitles
     if (subtitles.loadingEmbedded || subtitles.checkedEmbedded) return

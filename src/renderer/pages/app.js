@@ -37,11 +37,12 @@ function useScope (store, keys) {
 
 function App (props) {
   const fallback = React.useMemo(() => props.store || createStore(props.state), [props.store, props.state])
-  const state = useScope(fallback, ['location', 'window', 'playing.hideControls'])
+  const state = useScope(fallback, ['location', 'window', 'playing.hideControls', 'playing.engine', 'playing.location'])
   const classes = ['view-' + state.location.url(), 'is-' + process.platform]
   if (state.window.isFullScreen) classes.push('is-fullscreen')
   if (state.window.isFocused) classes.push('is-focused')
   if (state.playing.hideControls) classes.push('hide-video-controls')
+  if (state.location.url() === 'player' && state.playing.engine === 'vlc' && state.playing.location === 'local') classes.push('native-video')
   return (
     <div className={'app ' + classes.join(' ')}>
       <StoreHeader store={fallback} />
