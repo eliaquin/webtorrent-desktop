@@ -34,6 +34,7 @@ app.whenReady().then(async () => {
   })
   await win.loadFile(fixture)
   console.log(await win.webContents.executeJavaScript(`(${runPlaybackRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
+  console.log(await win.webContents.executeJavaScript(`(${runRecoveryRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
   console.log(await win.webContents.executeJavaScript(`(${runAudioRegressions.toString()})(${JSON.stringify(projectRoot)})`))
   const result = await win.webContents.executeJavaScript(`(${runUI.toString()})(${JSON.stringify(projectRoot)})`)
   console.log(result)
@@ -107,9 +108,10 @@ async function runPlaybackRegressions (projectRoot, directory) {
     const starts = commands.length
     await controller.startTorrentingSummary(1)
     assert.strictEqual(torrent.error, 'path-missing')
+    assert.strictEqual(torrent.status, 'paused', 'missing files are stopped, not shown as an active transfer')
     assert.strictEqual(commands.length, starts, 'missing completed data is not redownloaded silently')
     fs.writeFileSync(path.join(directory, torrent.files[0].path), 'restored data')
-    await controller.startTorrentingSummary(1)
+    await controller.toggleTorrent(torrent.infoHash)
     assert(!torrent.error, 'restoring the data clears the old path error')
 
     // An outstanding filesystem check must respect later UI actions.
@@ -204,6 +206,123 @@ async function runPlaybackRegressions (projectRoot, directory) {
     native.subtitleToolsAvailable = originals.tools
     native.clipboard.writeText = originals.copy
     clearTimeout(subtitleController?.toolsTimer)
+  }
+}
+
+async function runRecoveryRegressions (projectRoot, directory) {
+  const assert = require('assert')
+  const { ipcRenderer } = require('electron')
+  const native = require(projectRoot + '/build/renderer/lib/native-api')
+  const dispatcher = require(projectRoot + '/build/renderer/lib/dispatcher')
+  const TorrentListController = require(projectRoot + '/build/renderer/controllers/torrent-list-controller')
+  const state = require(projectRoot + '/build/renderer/lib/store').createStore({
+    saved: { prefs: { downloadPath: directory }, torrents: [] }
+  }).state
+  const controller = new TorrentListController(state)
+  const originals = { send: ipcRenderer.send, choosePath: native.choosePath, statPath: native.statPath }
+  const commands = []
+  const events = []
+  const reset = () => {
+    state.saved.torrents = [{
+      torrentKey: 9,
+      infoHash: 'recovery',
+      magnetURI: 'magnet:?xt=urn:btih:recovery',
+      name: 'Missing film',
+      status: 'paused',
+      error: 'path-missing',
+      path: '/missing-drive',
+      files: [{ name: 'film.mp4', path: 'film.mp4', currentTime: 30 }, { name: 'notes.txt', path: 'notes.txt' }],
+      selections: [true, false],
+      fileModtimes: [123, 456],
+      progress: { progress: 1 }
+    }]
+    commands.length = 0
+    events.length = 0
+    return state.saved.torrents[0]
+  }
+  try {
+    ipcRenderer.send = (...args) => commands.push(args)
+    dispatcher.setDispatch((...args) => events.push(args))
+    let torrent = reset()
+    delete torrent.fileModtimes
+    delete torrent.progress
+    delete torrent.error
+    torrent.status = 'seeding'
+    native.statPath = async () => { throw new Error('Missing data') }
+    await controller.startTorrentingSummary(9)
+    await controller.toggleTorrent('recovery')
+    assert.strictEqual(torrent.error, 'path-missing')
+    assert.strictEqual(torrent.status, 'paused')
+    assert.strictEqual(commands.length, 0, 'Retry keeps the missing-data safeguard even without saved timestamps')
+    native.statPath = async () => ({ isDirectory: true })
+    torrent = reset()
+    const saved = JSON.stringify(torrent)
+    native.choosePath = async () => []
+    await controller.recoverTorrent('recovery')
+    assert.strictEqual(JSON.stringify(torrent), saved, 'canceling preserves the old path, completion and missing-path error')
+    assert.deepStrictEqual(commands, [])
+    assert.deepStrictEqual(events, [])
+
+    let options
+    native.choosePath = async opts => { options = opts; return [directory] }
+    await controller.recoverTorrent('recovery')
+    assert(options.properties.includes('openDirectory'))
+    assert(options.message.includes('missing files will be downloaded again'), 'the folder picker explains the recovery action')
+    assert.strictEqual(torrent.path, directory)
+    assert.strictEqual(torrent.status, 'new')
+    assert(!torrent.error && !torrent.fileModtimes && !torrent.progress, 'old completion claims cannot bypass verification')
+    assert.deepStrictEqual(torrent.selections, [true, false])
+    assert.strictEqual(torrent.files[0].currentTime, 30, 'recovery preserves playback position')
+    assert.deepStrictEqual(commands, [['wt-start-torrenting', 9, torrent.magnetURI, directory, undefined, [true, false]]])
+    assert.deepStrictEqual(events, [['stateSave']], 'the new location is persisted')
+
+    torrent = reset()
+    native.statPath = async () => { throw new Error('Folder unavailable') }
+    await controller.recoverTorrent('recovery')
+    assert.strictEqual(torrent.path, '/missing-drive', 'an unavailable destination cannot overwrite the original path')
+    assert.strictEqual(torrent.error, 'path-missing')
+    assert.strictEqual(commands.length, 0)
+    assert.strictEqual(events[0][0], 'error')
+    native.statPath = async () => ({ isDirectory: true })
+
+    let finishDialog
+    let dialogCount = 0
+    native.choosePath = () => { dialogCount++; return new Promise(resolve => { finishDialog = resolve }) }
+    for (const action of ['pause', 'remove', 'retry']) {
+      torrent = reset()
+      const pending = controller.recoverTorrent('recovery')
+      await controller.recoverTorrent('recovery')
+      if (action === 'pause') controller.pauseTorrent(torrent, false)
+      if (action === 'remove') state.saved.torrents = []
+      if (action === 'retry') {
+        native.statPath = async () => { throw new Error('Still missing') }
+        await controller.toggleTorrent('recovery')
+        native.statPath = async () => ({ isDirectory: true })
+      }
+      const count = commands.length
+      finishDialog([directory])
+      await pending
+      assert.strictEqual(commands.length, count, 'a late folder dialog cannot override ' + action)
+      assert.strictEqual(torrent.path, '/missing-drive')
+    }
+    assert.strictEqual(dialogCount, 3, 'repeated clicks open only one folder dialog per torrent')
+
+    torrent = reset()
+    native.choosePath = async () => [directory]
+    let finishStat
+    native.statPath = () => new Promise(resolve => { finishStat = resolve })
+    const pending = controller.recoverTorrent('recovery')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    controller.pauseTorrent(torrent, false)
+    finishStat({ isDirectory: true })
+    await pending
+    assert.strictEqual(torrent.path, '/missing-drive', 'a late destination check cannot override Pause')
+    assert(!commands.some(command => command[0] === 'wt-start-torrenting'))
+    return 'Recovery tests passed: cancellation, verified restart, selections and position, invalid destinations, duplicate dialogs and stale actions'
+  } finally {
+    ipcRenderer.send = originals.send
+    native.choosePath = originals.choosePath
+    native.statPath = originals.statPath
   }
 }
 
@@ -457,6 +576,14 @@ async function runUI (projectRoot) {
   await click(button('All'))
   await act(async () => { downloads.error = new Error('Disk is full') })
   assert(document.querySelector('.torrent-transfer').textContent.includes('Disk is full'), 'torrent errors show their recovery context')
+  await act(async () => { downloads.error = 'path-missing' })
+  events.length = 0
+  assert(document.querySelector('.torrent-status').textContent.includes('Needs attention'))
+  assert.strictEqual(document.querySelector('.download').getAttribute('aria-label'), 'Retry torrent', 'missing paths never show a misleading Pause action')
+  await click(document.querySelector('.download'))
+  await click(button('Download again…'))
+  assert.deepStrictEqual(events, [['toggleTorrent', 'abc'], ['recoverTorrent', 'abc']], 'missing files expose retry and redownload directly on the card')
+  assert(document.querySelector('.torrent-transfer').textContent.includes('choose a folder'))
   await act(async () => { delete downloads.error; state.saved.torrents = [downloads] })
 
   const readClipboard = clipboard.readTextAsync

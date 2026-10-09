@@ -13,6 +13,7 @@ module.exports = class TorrentListController {
   constructor (state) {
     this.state = state
     this.pendingStarts = new WeakMap()
+    this.pendingRecoveries = new WeakSet()
   }
 
   // Adds a torrent to the list, starts downloading/seeding.
@@ -105,7 +106,7 @@ module.exports = class TorrentListController {
 
     // Metadata can exist before the first piece is written to disk. Downloads
     // must be able to create their data files when resumed or prioritized.
-    const completed = s.status === 'seeding' || s.progress?.progress === 1 ||
+    const completed = s.error === 'path-missing' || s.status === 'seeding' || s.progress?.progress === 1 ||
       s.fileModtimes?.some(time => time != null)
     if (!fileOrFolder || !completed) return start()
 
@@ -114,8 +115,47 @@ module.exports = class TorrentListController {
       if (!isCurrent()) return
       this.pendingStarts.delete(s)
       s.error = 'path-missing'
+      s.status = 'paused'
+      dispatch('stateSave')
       dispatch('backToList')
     })
+  }
+
+  // Explicitly recover missing data, verifying existing files in the chosen folder.
+  async recoverTorrent (infoHash) {
+    const s = TorrentSummary.getByKey(this.state, infoHash)
+    if (!s || s.error !== 'path-missing' || this.pendingRecoveries.has(s)) return
+    const attempt = {}
+    this.pendingStarts.set(s, attempt)
+    this.pendingRecoveries.add(s)
+    const isCurrent = () => this.pendingStarts.get(s) === attempt &&
+      TorrentSummary.getByKey(this.state, infoHash) === s && s.error === 'path-missing'
+    try {
+      const [folder] = await native.choosePath({
+        title: 'Download again: ' + s.name,
+        message: 'Choose a download folder. Existing matching files will be checked; missing files will be downloaded again.',
+        defaultPath: s.path || this.state.saved.prefs.downloadPath,
+        buttonLabel: 'Download here',
+        properties: ['openDirectory', 'createDirectory']
+      })
+      if (!folder || !isCurrent()) return
+      const stat = await native.statPath(folder)
+      if (!isCurrent()) return
+      if (!stat.isDirectory) throw new Error('Choose a folder for this download.')
+      s.path = folder
+      // Old completion timestamps must not skip verification in a different folder.
+      delete s.fileModtimes
+      delete s.progress
+      delete s.error
+      s.status = 'new'
+      await this.startTorrentingSummary(s.torrentKey)
+      dispatch('stateSave')
+    } catch (err) {
+      if (isCurrent()) dispatch('error', err)
+    } finally {
+      this.pendingRecoveries.delete(s)
+      if (this.pendingStarts.get(s) === attempt) this.pendingStarts.delete(s)
+    }
   }
 
   setGlobalTrackers (globalTrackers) {
@@ -125,11 +165,11 @@ module.exports = class TorrentListController {
   // TODO: use torrentKey, not infoHash
   toggleTorrent (infoHash) {
     const torrentSummary = TorrentSummary.getByKey(this.state, infoHash)
-    if (torrentSummary.status === 'paused') {
+    if (torrentSummary.status === 'paused' || torrentSummary.error === 'path-missing') {
       torrentSummary.status = 'new'
-      this.startTorrentingSummary(torrentSummary.torrentKey)
+      const started = this.startTorrentingSummary(torrentSummary.torrentKey)
       sound.play('ENABLE')
-      return
+      return started
     }
 
     this.pauseTorrent(torrentSummary, true)

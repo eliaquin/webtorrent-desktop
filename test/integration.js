@@ -39,8 +39,8 @@ async function main () {
         fromProject(root + '/build/main/windows').main.dispatch(...args)
       }, [name, ...args])
     }
-    function waitForService (name, completeMetadata = false) {
-      return application.evaluate((electron, { name, completeMetadata }) => {
+    function waitForService (name, completeMetadata = false, infoHash) {
+      return application.evaluate((electron, { name, completeMetadata, infoHash }) => {
         const root = electron.app.getAppPath()
         const fromProject = process.getBuiltinModule('module').createRequire(root + '/package.json')
         const service = fromProject(root + '/build/main/torrent-service')
@@ -48,13 +48,14 @@ async function main () {
           const timeout = setTimeout(() => reject(new Error('Utility event timed out: ' + name)), 30000)
           const listener = (...args) => {
             if (completeMetadata && !args[2]?.format?.duration) return
+            if (infoHash && args[1]?.infoHash !== infoHash) return
             service.events.removeListener(name, listener)
             clearTimeout(timeout)
             resolve(args)
           }
           service.events.on(name, listener)
         })
-      }, { name, completeMetadata })
+      }, { name, completeMetadata, infoHash })
     }
 
     await dispatch('showCreateTorrent', [video, text])
@@ -196,6 +197,80 @@ async function main () {
     await dispatch('stopCasting')
     await page.waitForFunction(() => document.querySelector('audio')?.readyState >= 2)
     console.log('Integration: sandboxed file paths, utility casting discovery, selection and return to local audio passed')
+
+    // Recover a completed torrent whose data moved, then restart in an empty folder.
+    await dispatch('backToList')
+    const movedDownloads = path.join(directory, 'Moved downloads')
+    fs.mkdirSync(movedDownloads)
+    let stoppedFixture = waitForService('wt-progress')
+    await dispatch('toggleTorrent', info.infoHash)
+    await stoppedFixture
+    fs.renameSync(seeds, path.join(movedDownloads, 'Fixture'))
+    await dispatch('toggleTorrent', info.infoHash)
+    await page.getByRole('button', { name: 'Retry torrent', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Retry torrent', exact: true }).click()
+    await page.getByRole('button', { name: 'Retry torrent', exact: true }).waitFor()
+    if (process.env.RECOVERY_SCREENSHOT_PATH) await page.screenshot({ path: process.env.RECOVERY_SCREENSHOT_PATH })
+    let recoveryButton = page.getByRole('button', { name: 'Download again…', exact: true })
+    await application.evaluate(({ dialog }) => { dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] }) })
+    await recoveryButton.click()
+    await dispatch('stateSaveImmediate')
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(directory, 'config.json'))).torrents.find(t => t.infoHash === info.infoHash).path, info.path, 'cancel preserves the saved location')
+
+    for (let i = 0; i < 100; i++) {
+      const missing = JSON.parse(fs.readFileSync(path.join(directory, 'config.json'))).torrents.find(t => t.infoHash === info.infoHash)
+      if (missing.error === 'path-missing' && missing.status === 'paused') break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    await application.close()
+    application = await _electron.launch({ executablePath: packaged || require('electron'), args: packaged ? ['--hidden'] : [path.join(__dirname, '..'), '--hidden'], env: { ...process.env, NODE_ENV: 'test', WEBTORRENT_TEST_DIR: directory } })
+    page = application.windows().find(page => page.url().endsWith('/main.html')) || await application.firstWindow()
+    page.setDefaultTimeout(30000)
+    await page.getByRole('button', { name: 'Retry torrent', exact: true }).waitFor()
+    recoveryButton = page.getByRole('button', { name: 'Download again…', exact: true })
+
+    await application.evaluate(({ dialog }, destination) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [destination] })
+    }, movedDownloads)
+    const recovered = waitForService('wt-ready', false, info.infoHash)
+    await recoveryButton.click()
+    const [, recoveredInfo] = await recovered
+    assert.strictEqual(fs.realpathSync(recoveredInfo.path), fs.realpathSync(movedDownloads))
+    assert.strictEqual(recoveredInfo.bytesReceived, 0, 'moved files are verified without downloading again')
+    const fixtureCard = page.locator('.torrent').filter({ has: page.getByRole('heading', { name: info.name, exact: true }) })
+    await fixtureCard.getByText('Seeding', { exact: true }).waitFor()
+    assert.strictEqual(await fixtureCard.getByRole('button', { name: 'Download again…' }).count(), 0, 'successful recovery removes the error actions')
+
+    stoppedFixture = waitForService('wt-progress')
+    await fixtureCard.getByRole('button', { name: 'Pause torrent' }).click()
+    await stoppedFixture
+    const offlineDownloads = path.join(directory, 'Offline downloads')
+    fs.renameSync(movedDownloads, offlineDownloads)
+    await fixtureCard.getByRole('button', { name: 'Resume torrent' }).click()
+    await fixtureCard.getByRole('button', { name: 'Retry torrent' }).waitFor()
+    const emptyDownloads = path.join(directory, 'New downloads')
+    fs.mkdirSync(emptyDownloads)
+    await application.evaluate(({ dialog }, destination) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [destination] })
+    }, emptyDownloads)
+    const restarted = waitForService('wt-ready', false, info.infoHash)
+    await fixtureCard.getByRole('button', { name: 'Download again…' }).click()
+    const [, restartedInfo] = await restarted
+    assert.strictEqual(fs.realpathSync(restartedInfo.path), fs.realpathSync(emptyDownloads))
+    await fixtureCard.getByText('Downloading', { exact: true }).waitFor()
+    await fixtureCard.getByText('0%', { exact: true }).waitFor()
+    await dispatch('stateSaveImmediate')
+    let recoveredSaved
+    for (let i = 0; i < 100; i++) {
+      recoveredSaved = JSON.parse(fs.readFileSync(path.join(directory, 'config.json'))).torrents.find(t => t.infoHash === info.infoHash)
+      if (recoveredSaved.path === restartedInfo.path && !recoveredSaved.fileModtimes) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    assert.strictEqual(fs.realpathSync(recoveredSaved.path), fs.realpathSync(emptyDownloads))
+    assert(!recoveredSaved.error && !recoveredSaved.fileModtimes, 'restart does not persist stale errors or completion timestamps')
+    assert.deepStrictEqual(recoveredSaved.selections, [true, true])
+    assert(fs.existsSync(path.join(offlineDownloads, 'Fixture', path.basename(video))), 'recovery preserves files at the old location')
+    console.log('Integration: missing-path retry, canceled recovery, restart persistence, moved-file verification and fresh download passed')
   } catch (error) {
     if (page) console.error(await page.evaluate(() => ({ body: document.body.innerText.slice(-1500), video: document.querySelector('video') && { readyState: document.querySelector('video').readyState, src: document.querySelector('video').src, error: document.querySelector('video').error?.message }, subtitle: document.querySelector('.subtitle-track-label')?.textContent, audio: document.querySelector('audio') && { readyState: document.querySelector('audio').readyState, src: document.querySelector('audio').src, error: document.querySelector('audio').error?.message, paused: document.querySelector('audio').paused, networkState: document.querySelector('audio').networkState } })))
     throw error

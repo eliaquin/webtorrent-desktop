@@ -143,6 +143,7 @@ module.exports = class TorrentList extends React.Component {
   renderTorrentButtons (torrent, isSelected, detailId) {
     const infoHash = torrent.infoHash
     const active = ['downloading', 'seeding', 'new'].includes(torrent.status)
+    const missing = torrent.error === 'path-missing'
     return (
       <div className='torrent-controls'>
         {!torrent.error && TorrentPlayer.isPlayableTorrentSummary(torrent) && (
@@ -152,11 +153,16 @@ module.exports = class TorrentList extends React.Component {
         )}
         <button
           type='button' className='shelf-button download' disabled={!infoHash}
-          aria-label={active ? 'Pause torrent' : 'Resume torrent'} title={active ? 'Pause transfer' : 'Resume transfer'}
+          aria-label={missing ? 'Retry torrent' : active ? 'Pause torrent' : 'Resume torrent'} title={missing ? 'Retry original location' : active ? 'Pause transfer' : 'Resume transfer'}
           onClick={dispatcher('toggleTorrent', infoHash)}
         >
-          <i className='icon' aria-hidden='true'>{active ? 'pause' : 'file_download'}</i>
+          <i className='icon' aria-hidden='true'>{missing ? 'refresh' : active ? 'pause' : 'file_download'}</i>{missing && 'Retry'}
         </button>
+        {missing && (
+          <button type='button' className='shelf-button torrent-recover' disabled={!infoHash} onClick={dispatcher('recoverTorrent', infoHash)}>
+            Download again…
+          </button>
+        )}
         <button
           type='button' className='shelf-button torrent-files' disabled={!infoHash}
           aria-label={'Show files for ' + (torrent.name || 'torrent')} aria-expanded={isSelected} aria-controls={isSelected ? detailId : undefined}
@@ -322,7 +328,7 @@ function getErrorMessage (torrentSummary) {
     return (
       <span key='path-missing'>
         Path missing.<br />
-        Reconnect your drive, then resume this torrent.
+        Reconnect your drive and retry, or choose a folder to download again.
       </span>
     )
   }

@@ -39,8 +39,8 @@ async function saveImmediate (state) {
         if (key === 'progress' || key === 'torrentKey') {
           continue // Don't save progress info or key for the webtorrent process
         }
-        if (key === 'error') {
-          continue // Don't save error states
+        if (key === 'error' && x.error !== 'path-missing') {
+          continue // Only missing data needs a recovery action after restarting.
         }
         torrent[key] = x[key]
       }
