@@ -1,4 +1,4 @@
-const { TextField } = require('./ui')
+const { Button, TextField } = require('./ui')
 const React = require('react')
 const { clipboard } = require('../lib/native-api')
 
@@ -18,6 +18,9 @@ module.exports = class OpenTorrentAddressModal extends React.Component {
   render () {
     return (
       <div className='open-torrent-address-modal'>
+        <h2>Add torrent</h2>
+        <p>Stream media while it downloads.</p>
+        <Button label='Choose torrent files…' onClick={() => { dispatch('exitModal'); dispatch('openTorrentFile') }} />
         <p><label htmlFor='torrent-address-field'>Enter torrent address or magnet link</label></p>
         <div>
           <TextField
@@ -38,9 +41,9 @@ module.exports = class OpenTorrentAddressModal extends React.Component {
         </div>
         {this.state.error && <p id='torrent-address-error' className='error-text' role='alert'>{this.state.error}</p>}
         <ModalOKCancel
-          cancelText='CANCEL'
+          cancelText='Cancel'
           onCancel={dispatcher('exitModal')}
-          okText='OK'
+          okText='Add torrent'
           okDisabled={!this.state.address.trim()}
           okAutoFocus={false}
           onOK={handleOK.bind(this)}

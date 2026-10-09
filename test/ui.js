@@ -317,7 +317,8 @@ async function runUI (projectRoot) {
   }
 
   function button (label) {
-    return [...document.querySelectorAll('button')].find(el => el.textContent === label)
+    const scope = document.querySelector('[role=dialog]') || document
+    return [...scope.querySelectorAll('button')].find(el => el.textContent === label)
   }
 
   let input
@@ -388,6 +389,76 @@ async function runUI (projectRoot) {
   assert.deepStrictEqual(events, [['toggleTorrent', 'abc']], 'download control does not select the torrent row')
   assert.strictEqual(document.querySelector('progress').value, 50)
 
+  const downloads = state.saved.torrents[0]
+  state.saved.torrents.push({ torrentKey: 2, infoHash: 'paused', name: 'Paused film', status: 'paused', files: [{ name: 'film.mp4', path: 'film.mp4', length: 256 }], selections: [true], progress: { progress: 0.25, downloaded: 64, length: 256 } })
+  state.saved.torrents.push({ torrentKey: 3, infoHash: 'seed', name: 'Finished film', status: 'seeding', files: [{ name: 'finished.mp4', path: 'finished.mp4', length: 256 }], progress: { progress: 1, downloaded: 256, length: 256, uploadSpeed: 128, numPeers: 2 } })
+  await render(h(App, { store }))
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 3)
+  await click(button('Paused'))
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 1, 'status filter isolates paused torrents')
+  assert.strictEqual(document.querySelector('.torrent progress').value, 25, 'paused downloads retain progress')
+  await type(document.querySelector('[aria-label="Search library"]'), 'nothing here')
+  assert(document.querySelector('.shelf-empty').textContent.includes('No matching torrents'))
+  await click(button('Clear filters'))
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 3, 'clear filters restores the shelf')
+  await type(document.querySelector('[aria-label="Search library"]'), ' FINISHED ')
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 1, 'search ignores case and surrounding spaces')
+  await type(document.querySelector('[aria-label="Search library"]'), '')
+  events.length = 0
+  await click(document.querySelector('[aria-label="Show files for Paused film"]'))
+  assert.deepStrictEqual(events.pop(), ['toggleSelectTorrent', 'paused'])
+  state.selectedInfoHash = 'paused'
+  await render(h(App, { store }))
+  events.length = 0
+  await click(document.querySelector('.torrent.selected .play'))
+  assert.deepStrictEqual(events, [['playFile', 'paused']], 'streaming does not toggle selection')
+  await click(document.querySelector('.torrent.selected .torrent-more'))
+  assert.deepStrictEqual(events.pop(), ['openTorrentContextMenu', 'paused'])
+  await click(document.querySelector('[aria-label="Download film.mp4"]'))
+  assert.deepStrictEqual(events.pop(), ['toggleTorrentFile', 'paused', 0], 'file checkbox toggles only its file')
+  const paused = state.saved.torrents[1]
+  paused.files = [
+    { name: 'padding', path: '/.____padding_file/0', length: 1 },
+    { name: 'Z.mp4', path: 'Z.mp4', length: 128 },
+    { name: 'A.mp4', path: 'A.mp4', length: 128 }
+  ]
+  paused.selections = [false, true, true]
+  state.saved.prefs.sortByName = true
+  await render(h(App, { store }))
+  assert.strictEqual(document.querySelectorAll('.torrent-details tr').length, 2, 'padding files remain hidden')
+  await click(document.querySelector('[aria-label="Download A.mp4"]'))
+  assert.deepStrictEqual(events.pop(), ['toggleTorrentFile', 'paused', 2], 'sorting and hidden padding preserve original file indices')
+  await click(document.querySelector('.torrent.selected .file-open'))
+  assert.deepStrictEqual(events.pop(), ['playFile', 'paused', 2], 'keyboard-accessible file actions use the original file index')
+  await click(button('Paused'))
+  await act(async () => { paused.status = 'downloading' })
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 0, 'live status updates remove torrents from the current filter')
+  await click(button('Clear filters'))
+  state.downloadPathStatus = 'missing'
+  await render(h(App, { store }))
+  await click(button('Choose download folder'))
+  assert.deepStrictEqual(events.pop(), ['preferences'], 'missing folder exposes recovery')
+  state.downloadPathStatus = undefined
+  state.selectedInfoHash = null
+  state.saved.torrents = []
+  await render(h(App, { store }))
+  assert(document.querySelector('.shelf-empty').textContent.includes('Your shelf is ready'))
+  await click(button('Add your first torrent'))
+  assert.deepStrictEqual(events.pop(), ['openTorrentAddress'])
+  state.saved.torrents = [downloads]
+  await render(h(App, { store }))
+  state.saved.torrents.push({ torrentKey: 4, name: 'Fetching metadata', status: 'new' })
+  await render(h(App, { store }))
+  await click(button('Downloading'))
+  assert.strictEqual(document.querySelectorAll('.torrent').length, 2, 'metadata fetches appear in the downloading filter')
+  const pending = [...document.querySelectorAll('.torrent')].find(el => el.textContent.includes('Fetching metadata'))
+  assert(!pending.querySelector('progress').hasAttribute('value'), 'metadata loading uses indeterminate progress')
+  assert(pending.querySelector('.download').disabled, 'metadata cannot dispatch torrent commands before an infohash arrives')
+  await click(button('All'))
+  await act(async () => { downloads.error = new Error('Disk is full') })
+  assert(document.querySelector('.torrent-transfer').textContent.includes('Disk is full'), 'torrent errors show their recovery context')
+  await act(async () => { delete downloads.error; state.saved.torrents = [downloads] })
+
   const readClipboard = clipboard.readTextAsync
   const magnet = 'magnet:?xt=urn:btih:0123456789012345678901234567890123456789'
   dispatcher.setDispatch((...args) => {
@@ -399,6 +470,12 @@ async function runUI (projectRoot) {
     }
   })
   try {
+    clipboard.readTextAsync = async () => ''
+    state.modal = { id: 'open-torrent-address-modal' }
+    await render(h(App, { store }))
+    events.length = 0
+    await click(button('Choose torrent files…'))
+    assert.deepStrictEqual(events, [['exitModal'], ['openTorrentFile']], 'file picker closes the address modal before opening the native dialog')
     const { getTorrentAddressError } = require(projectRoot + '/build/shared/torrent-address')
     for (const valid of [magnet, ' https://example.com/download?id=1 ', '0123456789012345678901234567890123456789', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', 'instant.io/#0123456789012345678901234567890123456789']) assert.strictEqual(getTorrentAddressError(valid), '')
     for (const invalid of ['', ' \n ', 'not a torrent', 'https://', 'magnet:?dn=video', 'javascript:alert(1)']) assert(getTorrentAddressError(invalid))
@@ -419,18 +496,18 @@ async function runUI (projectRoot) {
       const field = document.querySelector('#torrent-address-field')
       assert(field, 'the modal reopens on every attempt without a forced root render')
       assert.strictEqual(document.activeElement, field)
-      assert(button('OK').disabled, 'OK is disabled for empty input')
+      assert(button('Add torrent').disabled, 'OK is disabled for empty input')
       events.length = 0
       await act(async () => field.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
       assert.deepStrictEqual(events, [], 'empty Enter does not add a torrent or close the dialog')
       assert(document.querySelector('#torrent-address-error'))
       await type(field, '   ')
-      assert(button('OK').disabled, 'whitespace cannot be submitted')
+      assert(button('Add torrent').disabled, 'whitespace cannot be submitted')
       await type(field, 'not a torrent')
-      await click(button('OK'))
+      await click(button('Add torrent'))
       assert.deepStrictEqual(events, [], 'invalid input stays in the form')
       assert.strictEqual(field.value, 'not a torrent', 'validation preserves the editable input')
-      await click(button('CANCEL'))
+      await click(button('Cancel'))
       assert.deepStrictEqual(events.pop(), ['exitModal'], 'cancel closes the modal')
       assert.strictEqual(document.querySelector('[role="dialog"]'), null)
     }
@@ -442,9 +519,9 @@ async function runUI (projectRoot) {
     await type(field, 'my draft')
     await act(async () => finishClipboard(magnet))
     assert.strictEqual(field.value, 'my draft', 'a late clipboard result does not overwrite typing')
-    await click(button('CANCEL'))
+    await click(button('Cancel'))
     await act(async () => { state.modal = { id: 'open-torrent-address-modal' } })
-    await click(button('CANCEL'))
+    await click(button('Cancel'))
     await act(async () => finishClipboard(magnet))
     assert.strictEqual(document.querySelector('[role="dialog"]'), null, 'late clipboard results do not reopen a closed dialog')
     await act(async () => { state.errors = [{ time: Date.now(), message: 'A recoverable error' }] })
@@ -512,5 +589,5 @@ async function runUI (projectRoot) {
   assert.deepStrictEqual(events.pop(), ['checkSubtitleTools'])
   state.location.url = () => 'preferences'
   await render(h(App, { store }))
-  return 'UI tests passed: native controls, preferences, torrent creation, download toggling, modals, selected subtitle label, empty CC menu, optional installation notice and instructions'
+  return 'UI tests passed: media shelf filters/search, live status updates, original file indices, stream/pause controls, file picker, empty/missing-folder states, native controls, preferences, torrent creation, modals and subtitle controls'
 }

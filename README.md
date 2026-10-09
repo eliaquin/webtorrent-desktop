@@ -115,6 +115,12 @@ UI state belongs to a private store. Components subscribe to the branches they
 use; download progress does not rerender the preferences page. Media DOM updates
 run after React commits, with playback events driving progress and volume.
 
+The library uses a responsive media shelf with poster previews, search, status
+filters and visible stream/pause controls. Open a poster or its Files button to
+choose individual files; More actions opens the native torrent menu. Add torrent
+accepts magnet links and torrent addresses or opens the native torrent-file picker.
+Search and filters are local to the library view and reset when leaving it.
+
 Usage diagnostics remain local and bounded in memory; crash uploads are disabled.
 Update checks use this fork's GitHub releases and require manual installation.
 

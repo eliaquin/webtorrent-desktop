@@ -89,8 +89,8 @@ module.exports = {
   WINDOW_MAIN: 'file://' + path.join(__dirname, '..', 'static', 'main.html'),
 
   WINDOW_INITIAL_BOUNDS: {
-    width: 500,
-    height: UI_HEADER_HEIGHT + (UI_TORRENT_HEIGHT * 6) // header + 6 torrents
+    width: 960,
+    height: 720
   },
   WINDOW_MIN_HEIGHT: UI_HEADER_HEIGHT + (UI_TORRENT_HEIGHT * 2), // header + 2 torrents
   WINDOW_MIN_WIDTH: 425,

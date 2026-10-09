@@ -72,9 +72,13 @@ async function main () {
     for (let i = 0; !fs.existsSync(posterPath) && i < 200; i++) await new Promise(resolve => setTimeout(resolve, 50))
     assert(fs.existsSync(posterPath), 'the utility process generates a video poster')
     assert.deepStrictEqual(fs.readFileSync(posterPath).subarray(0, 2), Buffer.from([0xff, 0xd8]), 'the poster is a JPEG')
+    await page.waitForFunction(() => {
+      const poster = document.querySelector('.torrent-cover img')
+      return poster && poster.complete && poster.naturalWidth > 0
+    })
 
     const running = waitForService('wt-server-running')
-    await dispatch('playFile', info.infoHash, videoIndex)
+    await page.locator('.torrent .play').click()
     const [stream] = await running
     await page.waitForFunction(() => {
       const video = document.querySelector('video')
