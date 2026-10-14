@@ -6,7 +6,7 @@ module.exports = {
 
 const cp = require('child_process')
 const path = require('path')
-const vlcCommand = require('vlc-command')
+const findVlc = require('./vlc-discovery')
 
 const log = require('./log')
 const windows = require('./windows')
@@ -17,7 +17,7 @@ let proc = null
 function checkInstall (playerPath, cb) {
   // check for VLC if external player has not been specified by the user
   // otherwise assume the player is installed
-  if (!playerPath) return vlcCommand(cb)
+  if (!playerPath) return findVlc().then(() => cb(null), cb)
   process.nextTick(() => cb(null))
 }
 
@@ -25,16 +25,15 @@ function spawn (playerPath, url, title) {
   if (playerPath) return spawnExternal(playerPath, [url])
 
   // Try to find and use VLC if external player is not specified
-  vlcCommand((err, vlcPath) => {
-    if (err) return windows.main.dispatch('externalPlayerNotFound')
+  findVlc().then(({ command, args: launcherArgs }) => {
     const args = [
       '--play-and-exit',
       '--quiet',
-      `--meta-title=${JSON.stringify(title)}`,
+      `--meta-title=${title}`,
       url
     ]
-    spawnExternal(vlcPath, args)
-  })
+    spawnExternal(command, [...launcherArgs, ...args])
+  }, () => windows.main.dispatch('externalPlayerNotFound'))
 }
 
 function kill () {

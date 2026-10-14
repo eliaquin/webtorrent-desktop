@@ -5,7 +5,7 @@ const defaultAnnounceList = config.DEFAULT_TRACKERS
 module.exports = { createState: getDefaultState, getDefaultPlayState }
 
 function getDefaultState () {
-  const LocationHistory = require('location-history')
+  const Navigation = require('./navigation')
 
   return {
     /*
@@ -19,7 +19,7 @@ function getDefaultState () {
       progress: -1,
       badge: null
     },
-    location: new LocationHistory(),
+    location: new Navigation(),
     window: {
       bounds: null, /* {x, y, width, height } */
       isFocused: true,

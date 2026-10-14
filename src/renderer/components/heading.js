@@ -1,4 +1,3 @@
-const React = require('react')
 const colors = require('./ui/colors')
 
 /** @param {{ level?: 1|2|3|4|5|6, children?: import('react').ReactNode }} props */

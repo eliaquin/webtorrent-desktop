@@ -11,7 +11,7 @@ const minimist = require('minimist')
 const os = require('os')
 const path = require('path')
 const removeDirectory = target => require('fs').rmSync(target, { recursive: true, force: true })
-const zip = require('cross-zip')
+const zip = require('./archive')
 
 const config = require('../src/config')
 const pkg = require('../package.json')
@@ -93,7 +93,7 @@ const all = {
 
   // Pattern which specifies which files to ignore when copying files to create the
   // package(s).
-  ignore: /^\/src|^\/native|^\/dist|\/(appveyor.yml|\.appveyor.yml|\.github|appdmg|AUTHORS|CONTRIBUTORS|bench|benchmark|benchmark\.js|bin|bower\.json|component\.json|coverage|doc|docs|docs\.mli|dragdrop\.min\.js|example|examples|example\.html|example\.js|externs|ipaddr\.min\.js|Makefile|min|minimist|perf|rusha|simplepeer\.min\.js|simplewebsocket\.min\.js|static\/screenshot\.png|test|tests|test\.js|tests\.js|webtorrent\.min\.js|\.[^/]*|.*\.md|.*\.markdown)$/,
+  ignore: /^\/src|^\/native|^\/dist|^\/eslint.config.mjs$|\/(appveyor.yml|\.appveyor.yml|\.github|appdmg|AUTHORS|CONTRIBUTORS|bench|benchmark|benchmark\.js|bin|bower\.json|component\.json|coverage|doc|docs|docs\.mli|dragdrop\.min\.js|example|examples|example\.html|example\.js|externs|ipaddr\.min\.js|Makefile|min|minimist|perf|rusha|simplepeer\.min\.js|simplewebsocket\.min\.js|static\/screenshot\.png|test|tests|test\.js|tests\.js|webtorrent\.min\.js|\.[^/]*|.*\.md|.*\.markdown)$/,
 
   // The application name.
   name: config.APP_NAME,

@@ -197,10 +197,10 @@ function renderMedia (state) {
       {renderOverlay(state)}
       {state.playing.audioSupport.converting || state.playing.audioSupport.message
         ? (
-          <div className='audio-conversion-notice' role='status'>
-            {state.playing.audioSupport.converting ? 'Preparing compatible audio…' : state.playing.audioSupport.message}
-            {state.playing.audioSupport.message ? <button onClick={dispatcher('mediaError', 'Audio could not be checked. Install FFmpeg or use an external player.')}>Use external player</button> : null}
-          </div>
+            <div className='audio-conversion-notice' role='status'>
+              {state.playing.audioSupport.converting ? 'Preparing compatible audio…' : state.playing.audioSupport.message}
+              {state.playing.audioSupport.message ? <button onClick={dispatcher('mediaError', 'Audio could not be checked. Install FFmpeg or use an external player.')}>Use external player</button> : null}
+            </div>
           )
         : null}
       {state.playing.nativeError && <div className='audio-conversion-notice' role='status'>{state.playing.nativeError}</div>}
@@ -588,21 +588,21 @@ function renderSubtitleInstallSteps (subtitles) {
       <strong>Install FFmpeg</strong>
       {process.platform === 'darwin'
         ? (
-          <>
-            <p>If you already have Homebrew, open Terminal and run:</p>
-            <code>brew install ffmpeg</code>
-            <button type='button' onClick={dispatcher('copySubtitleInstallCommand')}>{subtitles.commandCopied ? 'Copied' : 'Copy command'}</button>
-            <p>Need Homebrew? {externalLink('https://brew.sh/', 'Open the setup guide')} first.</p>
-          </>
+            <>
+              <p>If you already have Homebrew, open Terminal and run:</p>
+              <code>brew install ffmpeg</code>
+              <button type='button' onClick={dispatcher('copySubtitleInstallCommand')}>{subtitles.commandCopied ? 'Copied' : 'Copy command'}</button>
+              <p>Need Homebrew? {externalLink('https://brew.sh/', 'Open the setup guide')} first.</p>
+            </>
           )
         : (
-          <>
-            <p>{process.platform === 'win32'
-              ? 'Download a Windows build, then add the folder containing ffmpeg.exe and ffprobe.exe to your PATH.'
-              : 'Install the ffmpeg package using your distribution’s package manager.'}
-            </p>
-            <p>{externalLink('https://ffmpeg.org/download.html', 'Open FFmpeg downloads')}</p>
-          </>
+            <>
+              <p>{process.platform === 'win32'
+                ? 'Download a Windows build, then add the folder containing ffmpeg.exe and ffprobe.exe to your PATH.'
+                : 'Install the ffmpeg package using your distribution’s package manager.'}
+              </p>
+              <p>{externalLink('https://ffmpeg.org/download.html', 'Open FFmpeg downloads')}</p>
+            </>
           )}
       <p>Once installed, WebTorrent will check again automatically while these steps are open.</p>
       <div className='subtitle-help-actions'>

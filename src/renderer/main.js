@@ -10,7 +10,6 @@ const createGetter = require('../shared/lazy')
 const debounce = require('../shared/debounce')
 const dragDrop = require('./lib/drop-handler')
 const electron = require('electron')
-const React = require('react')
 const { createRoot } = require('react-dom/client')
 const native = require('./lib/native-api')
 

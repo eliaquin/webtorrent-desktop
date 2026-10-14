@@ -16,7 +16,7 @@
   <a href="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml"><img src="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml/badge.svg" alt="GitHub CI action"></a>
   <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/release/eliaquin/webtorrent-desktop.svg" alt="github release version"></a>
   <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/downloads/eliaquin/webtorrent-desktop/total.svg" alt="github release downloads"></a>
-  <a href="https://standardjs.com"><img src="https://img.shields.io/badge/code_style-standard-brightgreen.svg" alt="Standard - JavaScript Style Guide"></a>
+  <a href="https://eslint.org"><img src="https://img.shields.io/badge/lint-ESLint_10-4B32C3.svg" alt="ESLint 10"></a>
 </p>
 
 This is Eliaquin's personal fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
@@ -228,6 +228,11 @@ https://electronjs.org/docs/tutorial/quick-start
 
 React.js (Framework to work with Frontend UI):
 https://react.dev/learn
+
+Linting uses ESLint 10 with ESLint Stylistic and maintained React, import, Node and
+Promise plugins. `npm test` checks code and style; `npm run test-maintenance`
+checks navigation, VLC discovery, archive preservation and the lint configuration.
+Node 24 is recommended (Node 22 requires 22.13 or later).
 
 UI controls are local React components backed by native HTML controls in
 `src/renderer/components/ui/`, styled in `static/main.css`. No component framework

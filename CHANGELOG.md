@@ -1,3 +1,11 @@
+## 0.27.1 — remaining dependency replacements
+
+- Replace location-history with local navigation that preserves history after failed page loads.
+- Replace vlc-command with executable discovery and correct Flatpak launch arguments.
+- Replace cross-zip with native archive tools, preserving executable modes, symlinks and prior archives on failure.
+- Replace Standard with ESLint 10 and maintained lint plugins; retain the existing style and document rule differences.
+- Add navigation, VLC lookup/launch, archive and lint migration regression checks. Retain winreg pending Windows validation.
+
 ## 0.27.0 — dependency cleanup
 
 - Remove AirPlay, Chromecast and DLNA discovery, controls and UI; bind playback streaming to localhost.
