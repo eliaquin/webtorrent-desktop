@@ -37,6 +37,7 @@ app.whenReady().then(async () => {
   console.log(await win.webContents.executeJavaScript(`(${runPlaybackRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
   console.log(await win.webContents.executeJavaScript(`(${runRecoveryRegressions.toString()})(${JSON.stringify(projectRoot)}, ${JSON.stringify(tempDir)})`))
   console.log(await win.webContents.executeJavaScript(`(${runAudioRegressions.toString()})(${JSON.stringify(projectRoot)})`))
+  console.log(await win.webContents.executeJavaScript(`(${runDropRegressions.toString()})(${JSON.stringify(projectRoot)})`))
   const result = await win.webContents.executeJavaScript(`(${runUI.toString()})(${JSON.stringify(projectRoot)})`)
   console.log(result)
   if (process.env.UI_SCREENSHOT_PATH) {
@@ -50,6 +51,69 @@ app.whenReady().then(async () => {
   console.error(err)
   finish(1)
 })
+
+async function runDropRegressions (projectRoot) {
+  const assert = require('assert')
+  const attach = require(projectRoot + '/build/renderer/lib/drop-handler')
+  const target = document.createElement('div')
+  const input = document.createElement('input')
+  target.append(input)
+  document.body.append(target)
+  const files = []
+  const texts = []
+  const errors = []
+  const cleanup = attach(target, { onDrop: value => files.push(value), onDropText: value => texts.push(value), onError: error => errors.push(error) })
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+  function event (type, transfer, element = target) {
+    const event = new window.Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: transfer })
+    element.dispatchEvent(event)
+    return event
+  }
+  try {
+    const magnet = 'magnet:?xt=urn:btih:0123456789012345678901234567890123456789'
+    const transfer = new window.DataTransfer()
+    transfer.setData('text/plain', magnet)
+    event('dragenter', transfer)
+    event('dragenter', transfer, input)
+    event('dragleave', transfer, input)
+    assert(target.classList.contains('drag'), 'crossing child elements retains the drop highlight')
+    event('drop', transfer)
+    assert.deepStrictEqual(texts, [magnet])
+    assert(!target.classList.contains('drag'))
+    assert(!event('drop', transfer, input).defaultPrevented, 'text drops into editable fields remain native')
+    transfer.clearData()
+    transfer.setData('text/uri-list', '# A link\r\n' + magnet)
+    event('drop', transfer)
+    assert.strictEqual(texts.at(-1), magnet, 'URI-list comments are ignored')
+    const file = new window.File(['torrent'], 'sample.torrent')
+    transfer.items.add(file)
+    event('drop', transfer)
+    await settle()
+    assert.strictEqual(files.at(-1)[0], file, 'original File objects retain Electron path access')
+    assert.strictEqual(texts.length, 2, 'file and text payloads do not trigger duplicate actions')
+    const entry = { isFile: true, file: resolve => resolve(file) }
+    const batches = [Array(100).fill(entry), [entry], []]
+    const directory = { isDirectory: true, createReader: () => ({ readEntries: resolve => resolve(batches.shift()) }) }
+    const data = { types: ['Files'], files: [], items: [{ kind: 'file', getAsFile: () => null, webkitGetAsEntry: () => directory }] }
+    event('drop', data)
+    await settle()
+    assert.strictEqual(files.at(-1).length, 101, 'directory traversal reads every browser batch')
+    directory.createReader = () => ({ readEntries: (resolve, reject) => reject(new Error('Access denied')) })
+    event('drop', data)
+    await settle()
+    assert.strictEqual(errors.at(-1).message, 'Access denied', 'folder read errors reach the UI')
+    const count = files.length
+    event('drop', { types: ['Files'], files: [file] })
+    await settle()
+    assert.strictEqual(files.length, count + 1, 'FileList fallback works without DataTransferItem entries')
+    cleanup()
+    event('drop', transfer)
+    await settle()
+    assert.strictEqual(files.length, count + 1, 'cleanup detaches listeners')
+  } finally { cleanup(); target.remove() }
+  return 'Drop checks passed: files, magnet links, URI lists, editable fields, directory batches, errors and cleanup'
+}
 
 async function runPlaybackRegressions (projectRoot, directory) {
   const assert = require('assert')
@@ -383,13 +447,13 @@ async function runAudioRegressions (projectRoot) {
     await staleConversion
     assert(!state.playing.audioSupport.url, 'late conversion cannot replace a different file')
     native.cancelAudioConversions = async () => {}
-    const castingConversion = controller.checkAudioSupport(true)
+    const externalConversion = controller.checkAudioSupport(true)
     await new Promise(resolve => setTimeout(resolve, 0))
-    state.playing.location = 'chromecast'
+    state.playing.location = 'external'
     await controller.checkAudioSupport()
-    finishConversion('file:///cache/casting.mkv')
-    await castingConversion
-    assert(!state.playing.audioSupport.checked, 'casting does not prevent conversion when returning locally')
+    finishConversion('file:///cache/external.mkv')
+    await externalConversion
+    assert(!state.playing.audioSupport.checked, 'external playback does not prevent conversion when returning locally')
     state.playing.location = 'local'
     native.convertAudio = async () => { throw new Error('conversion failed') }
     await controller.checkAudioSupport(true)
@@ -706,11 +770,35 @@ async function runUI (projectRoot) {
   torrent.progress.files = []
   state.getPlayingTorrentSummary = () => torrent
   state.getPlayingFileSummary = () => torrent.files[0]
-  state.devices = {}
   state.playing = require(projectRoot + '/build/renderer/lib/state').getDefaultPlayState()
   Object.assign(state.playing, { type: 'video', infoHash: torrent.infoHash, fileIndex: 0, fileName: 'example.mp4' })
   state.playing.subtitles.tracks = [{ label: 'English' }, { label: 'English (Forced)' }]
   state.playing.subtitles.selectedIndex = 0
+  await render(h(App, { store }))
+
+  // Progress crosses IPC without its BitField prototype. Keep noncontiguous
+  // ranges and file boundaries accurate with the installed bitfield version.
+  const BitField = require(require.resolve('bitfield', { paths: [projectRoot] })).default
+  torrent.progress.bitfield = structuredClone(new BitField(new Uint8Array([0b11100001, 0b11000000])))
+  torrent.progress.files = [{ startPiece: 1, endPiece: 8, numPieces: 8 }]
+  await render(h(App, { store }))
+  const loadedRanges = () => [...document.querySelectorAll('.loading-bar-part')].map(el => [el.style.left, el.style.width])
+  assert.deepStrictEqual(loadedRanges(), [['0%', '25%'], ['75%', '25%']], 'loading ranges respect file offsets, gaps and byte boundaries')
+  torrent.progress.bitfield = structuredClone(new BitField(16))
+  await render(h(App, { store }))
+  assert.deepStrictEqual(loadedRanges(), [], 'empty bitfields have no loaded ranges')
+  torrent.progress.bitfield = structuredClone(new BitField(new Uint8Array([255, 255])))
+  await render(h(App, { store }))
+  assert.deepStrictEqual(loadedRanges(), [['0%', '100%']], 'completed files have one full loading range')
+  torrent.progress.files = []
+  delete torrent.progress.bitfield
+
+  const PlaybackController = require(projectRoot + '/build/renderer/controllers/playback-controller')
+  const playbackController = new PlaybackController(state, {}, () => {})
+  state.playing.location = 'local'
+  playbackController.changePlaybackRate(1)
+  assert.strictEqual(state.playing.playbackRate, 1.25, 'local playback speed remains adjustable')
+  state.playing.playbackRate = 1
   await render(h(App, { store }))
   assert.strictEqual(document.querySelector('.subtitle-track-label').textContent, 'English', 'selected subtitle appears next to CC')
   state.playing.subtitles.selectedIndex = 1

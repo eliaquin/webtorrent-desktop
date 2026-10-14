@@ -7,7 +7,7 @@ exports.send = [
   'openExternalPlayer', 'quitExternalPlayer', 'native:clipboard-write', 'native:torrent-menu',
   'wt-set-global-trackers', 'wt-start-torrenting', 'wt-stop-torrenting', 'wt-create-torrent',
   'wt-save-torrent-file', 'wt-generate-torrent-poster', 'wt-get-audio-metadata',
-  'wt-start-server', 'wt-stop-server', 'wt-select-files', 'wt-cast-command'
+  'wt-start-server', 'wt-stop-server', 'wt-select-files'
 ]
 exports.invoke = [
   'native:player-available', 'native:player-open', 'native:player-command', 'native:player-bounds', 'native:player-close',
@@ -21,5 +21,5 @@ exports.receive = [
   'log', 'error', 'dispatch', 'fullscreenChanged', 'windowBoundsChanged', 'checkForExternalPlayer',
   'wt-parsed', 'wt-metadata', 'wt-done', 'wt-ready', 'wt-file-modtimes', 'wt-warning',
   'wt-error', 'wt-file-saved', 'wt-poster', 'wt-audio-metadata', 'wt-server-running',
-  'wt-progress', 'wt-uncaught-error', 'wt-new-torrent', 'wt-cast-state'
+  'wt-progress', 'wt-uncaught-error', 'wt-new-torrent'
 ]

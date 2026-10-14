@@ -3,8 +3,7 @@ module.exports = {
   getNextIndex,
   hasPrevious,
   getPreviousIndex,
-  getCurrentLocalURL,
-  getCurrentNetworkURL
+  getCurrentLocalURL
 }
 
 const TorrentSummary = require('./torrent-summary')
@@ -39,10 +38,6 @@ function getPreviousIndex (state) {
 
 function getCurrentLocalURL (state) {
   return getCurrentURL(state, 'localURL')
-}
-
-function getCurrentNetworkURL (state) {
-  return getCurrentURL(state, 'networkURL')
 }
 
 function getCurrentURL (state, key) {

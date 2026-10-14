@@ -1,7 +1,7 @@
 const { Button, TextField, Checkbox } = require('../components/ui')
 const config = require('../../config')
 const path = require('path')
-const prettyBytes = require('prettier-bytes')
+const prettyBytes = require('../../shared/format-bytes')
 const React = require('react')
 
 const { dispatch, dispatcher } = require('../lib/dispatcher')

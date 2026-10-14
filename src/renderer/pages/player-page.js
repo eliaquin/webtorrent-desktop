@@ -3,7 +3,7 @@
 const React = require('react')
 const { shell } = require('electron')
 const BitField = require('bitfield').default
-const prettyBytes = require('prettier-bytes')
+const prettyBytes = require('../../shared/format-bytes')
 
 const TorrentSummary = require('../lib/torrent-summary')
 const Playlist = require('../lib/playlist')
@@ -11,11 +11,11 @@ const { dispatch, dispatcher } = require('../lib/dispatcher')
 const { calculateEta } = require('../lib/time')
 const NativeMedia = require('../components/native-media')
 
-// Shows a streaming video player. Standard features + Chromecast + Airplay
+// Shows local playback or the external-player/error screen.
 module.exports = class Player extends React.Component {
   render () {
     // Show the video as large as will fit in the window, play immediately
-    // If the video is on Chromecast or Airplay, show a title screen instead
+    // External playback and failures show a title screen instead.
     const state = this.props.state
     const showVideo = state.playing.location === 'local'
     const showControls = state.playing.location !== 'external'
@@ -25,7 +25,7 @@ module.exports = class Player extends React.Component {
         onWheel={handleVolumeWheel}
         onMouseMove={dispatcher('mediaMouseMoved')}
       >
-        {showVideo ? renderMedia(state) : renderCastScreen(state)}
+        {showVideo ? renderMedia(state) : renderPlaybackStatus(state)}
         {showControls ? renderPlayerControls(state) : null}
       </div>
     )
@@ -451,38 +451,11 @@ function renderLoadingSpinner (state) {
   )
 }
 
-function renderCastScreen (state) {
-  let castIcon, castType, isCast
-  if (state.playing.location.startsWith('chromecast')) {
-    castIcon = 'cast_connected'
-    castType = 'Chromecast'
-    isCast = true
-  } else if (state.playing.location.startsWith('airplay')) {
-    castIcon = 'airplay'
-    castType = 'AirPlay'
-    isCast = true
-  } else if (state.playing.location.startsWith('dlna')) {
-    castIcon = 'tv'
-    castType = 'DLNA'
-    isCast = true
-  } else if (state.playing.location === 'external') {
-    castIcon = 'tv'
-    castType = state.getExternalPlayerName()
-    isCast = false
-  } else if (state.playing.location === 'error') {
-    castIcon = 'error_outline'
-    castType = 'Unable to Play'
-    isCast = false
-  }
-
-  const isStarting = state.playing.location.endsWith('-pending')
-  const castName = state.playing.castName
+function renderPlaybackStatus (state) {
+  const external = state.playing.location === 'external'
+  const icon = external ? 'tv' : 'error_outline'
+  const title = external ? state.getExternalPlayerName() : 'Unable to Play'
   const fileName = state.getPlayingFileSummary().name || ''
-  let castStatus
-  if (isCast && isStarting) castStatus = 'Connecting to ' + castName + '...'
-  else if (isCast && !isStarting) castStatus = 'Connected to ' + castName
-  else castStatus = ''
-
   const prog = state.getPlayingTorrentSummary().progress || {}
 
   // Show a nice title image, if possible
@@ -534,40 +507,14 @@ function renderCastScreen (state) {
   }
 
   return (
-    <div key='cast' className='letterbox' style={style}>
-      <div className='cast-screen'>
-        <i className='icon'>{castIcon}</i>
-        <div key='type' className='cast-type'>{castType}</div>
-        <div key='status' className='cast-status'>{castStatus}</div>
+    <div key='playback-status' className='letterbox' style={style}>
+      <div className='playback-status-screen'>
+        <i className='icon'>{icon}</i>
+        <div key='type' className='playback-status-title'>{title}</div>
         <div key='name' className='name'>{fileName}</div>
         {renderDownloadProgress()}
       </div>
     </div>
-  )
-}
-
-function renderCastOptions (state) {
-  if (!state.devices.castMenu) return
-
-  const { location, devices } = state.devices.castMenu
-  const player = state.devices[location]
-
-  const items = devices.map((device, ix) => {
-    const isSelected = player.device === device
-    const name = device.name
-    return (
-      <li key={ix} onClick={dispatcher('selectCastDevice', ix)}>
-        <i className='icon'>{isSelected ? 'radio_button_checked' : 'radio_button_unchecked'}</i>
-        {' '}
-        {name}
-      </li>
-    )
-  })
-
-  return (
-    <ul key='cast-options' className='options-list'>
-      {items}
-    </ul>
   )
 }
 
@@ -787,51 +734,6 @@ function renderPlayerControls (state) {
     ))
   }
 
-  // If we've detected a Chromecast or AppleTV, the user can play video there
-  const castTypes = ['chromecast', 'airplay', 'dlna']
-  const isCastingAnywhere = castTypes.some(
-    (castType) => state.playing.location.startsWith(castType))
-
-  // Add the cast buttons. Icons for each cast type, connected/disconnected:
-  const buttonIcons = {
-    chromecast: { true: 'cast_connected', false: 'cast' },
-    airplay: { true: 'airplay', false: 'airplay' },
-    dlna: { true: 'tv', false: 'tv' }
-  }
-  castTypes.forEach(castType => {
-    // Do we show this button (eg. the Chromecast button) at all?
-    const isCasting = state.playing.location.startsWith(castType)
-    const player = state.devices[castType]
-    if ((!player || player.getDevices().length === 0) && !isCasting) return
-
-    // Show the button. Three options for eg the Chromecast button:
-    let buttonClass, buttonHandler
-    if (isCasting) {
-      // Option 1: we are currently connected to Chromecast. Button stops the cast.
-      buttonClass = 'active'
-      buttonHandler = dispatcher('stopCasting')
-    } else if (isCastingAnywhere) {
-      // Option 2: we are currently connected somewhere else. Button disabled.
-      buttonClass = 'disabled'
-      buttonHandler = undefined
-    } else {
-      // Option 3: we are not connected anywhere. Button opens Chromecast menu.
-      buttonClass = ''
-      buttonHandler = dispatcher('toggleCastMenu', castType)
-    }
-    const buttonIcon = buttonIcons[castType][isCasting]
-
-    elements.push((
-      <i
-        key={castType}
-        className={'icon device float-right ' + buttonClass}
-        onClick={buttonHandler}
-      >
-        {buttonIcon}
-      </i>
-    ))
-  })
-
   // Show live torrent download statistics beside the right-hand controls.
   const progress = state.getPlayingTorrentSummary()?.progress
   if (Number.isFinite(progress?.progress) && progress.progress < 1) {
@@ -968,7 +870,6 @@ function renderPlayerControls (state) {
       onMouseLeave={dispatcher('mediaControlsMouseLeave')}
     >
       {elements}
-      {renderCastOptions(state)}
       {renderSubtitleOptions(state)}
       {renderAudioTrackOptions(state)}
     </div>

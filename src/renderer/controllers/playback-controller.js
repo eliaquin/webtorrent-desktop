@@ -1,7 +1,6 @@
 const { ipcRenderer } = require('electron')
 const path = require('path')
 
-const Cast = require('../lib/cast')
 const { dispatch } = require('../lib/dispatcher')
 const telemetry = require('../lib/telemetry')
 const { UnplayableFileError, UnplayableTorrentError } = require('../../shared/errors')
@@ -13,7 +12,7 @@ const native = require('../lib/native-api')
 const State = require('../lib/state')
 
 // Controls playback of torrents and files within torrents
-// both local (<video>,<audio>,external player) and remote (cast)
+// in the app (<video>, <audio>, native VLC) or an external player
 module.exports = class PlaybackController {
   constructor (state, config, update) {
     this.state = state
@@ -125,9 +124,6 @@ module.exports = class PlaybackController {
     const state = this.state
     if (!state.playing.isPaused) return
     state.playing.isPaused = false
-    if (isCasting(state)) {
-      Cast.play()
-    }
     ipcRenderer.send('onPlayerPlay')
   }
 
@@ -136,9 +132,6 @@ module.exports = class PlaybackController {
     const state = this.state
     if (state.playing.isPaused) return
     state.playing.isPaused = true
-    if (isCasting(state)) {
-      Cast.pause()
-    }
     ipcRenderer.send('onPlayerPause')
   }
 
@@ -153,8 +146,7 @@ module.exports = class PlaybackController {
       console.error('Tried to skip to a non-finite time ' + time)
       return console.trace()
     }
-    if (isCasting(this.state)) Cast.seek(time)
-    else this.state.playing.jumpToTime = time
+    this.state.playing.jumpToTime = time
   }
 
   // Show video preview
@@ -188,9 +180,6 @@ module.exports = class PlaybackController {
       rate /= 2
     }
     state.playing.playbackRate = rate
-    if (isCasting(state) && !Cast.setRate(rate)) {
-      state.playing.playbackRate = 1
-    }
     // Wait a bit before we hide the controls and header again
     state.playing.mouseStationarySince = new Date().getTime()
   }
@@ -208,18 +197,13 @@ module.exports = class PlaybackController {
     volume = Math.max(0, Math.min(1, volume))
 
     const state = this.state
-    if (isCasting(state)) {
-      Cast.setVolume(volume)
-    } else {
-      state.playing.setVolume = volume
-    }
+    state.playing.setVolume = volume
   }
 
   // Hide player controls while playing video, if the mouse stays still for a while
   // Never hide the controls when:
   // * The mouse is over the controls or we're scrubbing (see CSS)
   // * The video is paused
-  // * The video is playing remotely on Chromecast or Airplay
   showOrHidePlayerControls () {
     const state = this.state
     const hideControls = state.shouldHidePlayerControls()
@@ -355,11 +339,8 @@ module.exports = class PlaybackController {
     console.log('closePlayer')
     native.cancelAudioConversions().catch(() => {})
 
-    // Quit any external players, like Chromecast/Airplay/etc or VLC
+    // Quit the external player, if one is active
     const state = this.state
-    if (isCasting(state)) {
-      Cast.stop()
-    }
     if (state.playing.location === 'external') {
       ipcRenderer.send('quitExternalPlayer')
     }
@@ -391,15 +372,6 @@ module.exports = class PlaybackController {
 
     this.update()
   }
-}
-
-// Checks whether we are connected and already casting
-// Returns false if we not casting (state.playing.location === 'local')
-// or if we're trying to connect but haven't yet ('chromecast-pending', etc)
-function isCasting (state) {
-  return state.playing.location === 'chromecast' ||
-    state.playing.location === 'airplay' ||
-    state.playing.location === 'dlna'
 }
 
 function restoreBounds (state) {

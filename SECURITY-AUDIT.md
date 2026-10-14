@@ -60,13 +60,14 @@ while native dialogs and atomic profile persistence remain in the main process.
 Playwright now verifies sandboxed video playback, embedded cues, seeking, export
 and pause/resume, and local TCP tests verify real transfer and recheck/resume.
 
-Known casting compatibility packages still require patched XML/protobuf overrides.
+The October 13 dependency cleanup removes AirPlay, Chromecast and DLNA, their
+discovery/control IPC and receiver-origin exceptions. Playback binds to loopback.
+Remaining torrent/packaging dependencies still require the IP/XML overrides.
 Blocklists use a native Node `BlockList` adapter, including IPv6, rather than the
 upstream IP-set install script that forces a different package manager.
 
-Physical Chromecast, AirPlay and DLNA devices and Windows/Linux packages were
-not available for local validation. Parser and authorization compatibility were
-tested, but hardware casting remains a manual check.
+Windows/Linux packages were not available for local validation. Their
+OS integrations and packaging still need platform checks.
 
 Zero npm findings is a snapshot of known advisories, not proof that every possible
 vulnerability is eliminated. The system FFmpeg installation, operating system,

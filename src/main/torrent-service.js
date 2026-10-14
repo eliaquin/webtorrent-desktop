@@ -8,7 +8,7 @@ const windows = require('./windows')
 const commands = new Set([
   'wt-set-global-trackers', 'wt-start-torrenting', 'wt-stop-torrenting',
   'wt-create-torrent', 'wt-save-torrent-file', 'wt-generate-torrent-poster',
-  'wt-cast-command', 'wt-get-audio-metadata', 'wt-start-server', 'wt-stop-server', 'wt-select-files', 'wt-subtitle-task'
+  'wt-get-audio-metadata', 'wt-start-server', 'wt-stop-server', 'wt-select-files', 'wt-subtitle-task'
 ])
 let worker
 let ready = false

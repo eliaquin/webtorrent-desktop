@@ -756,10 +756,10 @@ video::-webkit-media-text-track-container {
 }
 
 /*
- * CHROMECAST / AIRPLAY CONTROLS
+ * EXTERNAL PLAYBACK / ERROR STATUS
  */
 
-.cast-screen {
+.playback-status-screen {
   width: 100%;
   height: 200px;
   color: #eee;
@@ -768,16 +768,15 @@ video::-webkit-media-text-track-container {
   align-self: center;
 }
 
-.cast-screen .icon {
+.playback-status-screen .icon {
   font-size: 50px;
 }
 
-.cast-screen .cast-type,
-.cast-screen .cast-status {
+.playback-status-screen .playback-status-title {
   font-size: 32px;
 }
 
-.cast-screen .cast-type {
+.playback-status-screen .playback-status-title {
   font-weight: bold;
 }
 

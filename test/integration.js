@@ -58,6 +58,37 @@ async function main () {
       }, { name, completeMetadata, infoHash })
     }
 
+    // Exercise the production folder watcher against actual filesystem events.
+    await application.evaluate(async ({ app }, directory) => {
+      const fromProject = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json')
+      const fs = fromProject('fs')
+      const path = fromProject('path')
+      const assert = fromProject('assert')
+      const FolderWatcher = fromProject(app.getAppPath() + '/build/main/folder-watcher')
+      const watched = path.join(directory, 'Watched')
+      fs.mkdirSync(watched)
+      fs.writeFileSync(path.join(watched, 'existing.torrent'), 'existing')
+      const received = []
+      const watcher = new FolderWatcher({
+        window: { dispatch: (...args) => received.push(args) },
+        state: { saved: { prefs: { autoAddTorrents: true, torrentsFolderPath: watched } } }
+      })
+      try {
+        watcher.start()
+        await new Promise((resolve, reject) => { watcher.watcher.once('ready', resolve); watcher.watcher.once('error', reject) })
+        fs.writeFileSync(path.join(watched, 'ignored.txt'), 'ignored')
+        const incoming = path.join(watched, 'incoming.TORRENT')
+        fs.writeFileSync(incoming, 'new')
+        const deadline = Date.now() + 10000
+        while (!received.length && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
+        assert.deepStrictEqual(received, [['addTorrent', incoming]], 'new torrent files are dispatched; existing and unrelated files are ignored')
+      } finally {
+        await watcher.watcher?.close()
+        watcher.stop()
+      }
+    }, directory)
+    console.log('Integration: Chokidar folder monitoring, case-insensitive torrent matching and initial-file filtering passed')
+
     await dispatch('showCreateTorrent', [video, text])
     await page.getByRole('button', { name: 'Show advanced settings...' }).click()
     await page.getByRole('textbox', { name: 'Trackers' }).fill('')
@@ -189,15 +220,16 @@ async function main () {
     await page.evaluate(() => { const input = document.createElement('input'); input.type = 'file'; input.id = 'test-file-bridge'; document.body.appendChild(input) })
     await page.locator('#test-file-bridge').setInputFiles(audio)
     assert.strictEqual(await page.evaluate(() => window.webtorrent.pathForFile(document.querySelector('#test-file-bridge').files[0])), audio)
+    await page.evaluate(() => {
+      const transfer = new window.DataTransfer()
+      transfer.items.add(document.querySelector('#test-file-bridge').files[0])
+      document.body.dispatchEvent(new window.DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+    })
     await page.locator('#test-file-bridge').evaluate(input => input.remove())
-    await dispatch('toggleCastMenu', 'chromecast')
-    await page.waitForFunction(() => document.querySelector('.options-list')?.textContent.includes('chromecast-1'))
-    await dispatch('selectCastDevice', 1)
-    await page.waitForSelector('.cast-status')
-    await dispatch('stopCasting')
-    await page.waitForFunction(() => document.querySelector('audio')?.readyState >= 2)
-    console.log('Integration: sandboxed file paths, utility casting discovery, selection and return to local audio passed')
-
+    // Dropping a media file while playing must preserve the player and explain
+    // that torrent creation starts from the library.
+    await page.waitForFunction(() => document.querySelector('.error-popover')?.textContent.includes('torrent list'))
+    assert.strictEqual(await page.locator('.icon.device').count(), 0, 'casting controls have been removed')
     // Recover a completed torrent whose data moved, then restart in an empty folder.
     await dispatch('backToList')
     const movedDownloads = path.join(directory, 'Moved downloads')

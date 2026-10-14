@@ -1,6 +1,6 @@
 const { Checkbox, ProgressBar } = require('../components/ui')
 const React = require('react')
-const prettyBytes = require('prettier-bytes')
+const prettyBytes = require('../../shared/format-bytes')
 
 const TorrentSummary = require('../lib/torrent-summary')
 const TorrentPlayer = require('../lib/torrent-player')

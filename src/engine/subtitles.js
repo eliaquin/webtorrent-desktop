@@ -1,34 +1,46 @@
 const fs = require('fs')
-const { Writable } = require('stream')
-const { pipeline } = require('stream/promises')
-const LanguageDetect = require('languagedetect')
-const srtToVtt = require('srt-to-vtt')
+const subtitleLanguage = require('./subtitle-language')
 
 async function readSubtitle (filePath) {
   if (typeof filePath !== 'string' || !/\.(srt|vtt)$/i.test(filePath)) throw new Error('Choose an SRT or VTT subtitle file')
   const chunks = []
   let size = 0
-  const collect = new Writable({
-    objectMode: true,
-    write (chunk, encoding, cb) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-      size += buffer.length
-      if (size > 16 * 1024 * 1024) return cb(new Error('Subtitle file is too large'))
-      chunks.push(buffer)
-      cb()
+  for await (const chunk of fs.createReadStream(filePath)) {
+    size += chunk.length
+    if (size > 16 * 1024 * 1024) throw new Error('Subtitle file is too large')
+    chunks.push(chunk)
+  }
+  const text = decode(Buffer.concat(chunks))
+  const converted = /\.srt$/i.test(filePath) ? toVtt(text) : text
+  const label = subtitleLanguage(filePath, text)
+  return { buffer: 'data:text/vtt;base64,' + Buffer.from(converted).toString('base64'), language: label, label, filePath }
+}
+
+function decode (buffer) {
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) return new TextDecoder('utf-16le').decode(buffer)
+  if (buffer[0] === 0xfe && buffer[1] === 0xff) return new TextDecoder('utf-16be').decode(buffer)
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer) } catch {
+    return new TextDecoder('windows-1252').decode(buffer)
+  }
+}
+
+function toVtt (text) {
+  const cues = text.trim().replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(cue => {
+    const lines = cue.split('\n')
+    const timing = lines.findIndex(line => line.includes('-->'))
+    if (timing === -1) return cue
+    lines[timing] = lines[timing].replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+    for (let i = timing + 1; i < lines.length; i++) {
+      if (lines[i].includes('{\\an8}')) {
+        if (!/\bline:/.test(lines[timing])) lines[timing] += ' line:5%'
+        lines[i] = lines[i].replace(/\{\\an8\}/g, '')
+      }
+      lines[i] = lines[i].replace(/\{\\([ibu])1\}|\{([ibu])\}/g, (_, a, b) => '<' + (a || b) + '>')
+        .replace(/\{\\([ibu])0?\}|\{\/([ibu])\}/g, (_, a, b) => '</' + (a || b) + '>')
     }
+    return lines.join('\n')
   })
-  // The legacy converter has no async iterator. Pipeline also forwards read
-  // errors and closes every stream when the size limit is exceeded.
-  const source = fs.createReadStream(filePath)
-  if (/\.srt$/i.test(filePath)) await pipeline(source, srtToVtt(), collect)
-  else await pipeline(source, collect)
-  const buffer = Buffer.concat(chunks)
-  const text = buffer.toString().replace(/(.*-->.*)/g, '')
-  const detected = new LanguageDetect().detect(text, 2)
-  const language = detected.length ? detected[0][0] : 'subtitle'
-  const label = language[0].toUpperCase() + language.slice(1)
-  return { buffer: 'data:text/vtt;base64,' + buffer.toString('base64'), language: label, label, filePath }
+  return 'WEBVTT\n\n' + cues.join('\n\n') + '\n'
 }
 
 module.exports = { readSubtitle }

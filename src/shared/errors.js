@@ -1,6 +1,5 @@
 /* Generic errors */
 
-class CastingError extends Error {}
 class PlaybackError extends Error {}
 class SoundError extends Error {}
 class TorrentError extends Error {}
@@ -28,7 +27,6 @@ class TorrentKeyNotFoundError extends TorrentError {
 }
 
 module.exports = {
-  CastingError,
   PlaybackError,
   SoundError,
   TorrentError,

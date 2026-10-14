@@ -8,7 +8,7 @@ State.load(onState)
 
 const createGetter = require('../shared/lazy')
 const debounce = require('../shared/debounce')
-const dragDrop = require('drag-drop')
+const dragDrop = require('./lib/drop-handler')
 const electron = require('electron')
 const React = require('react')
 const { createRoot } = require('react-dom/client')
@@ -36,9 +36,6 @@ require('./lib/dispatcher').setDispatch(dispatch)
 
 // From dispatch(...), events are sent to one of the controllers
 let controllers = null
-
-// This dependency is the slowest-loading, so we lazy load it
-let Cast = null
 
 // All state lives in state.js. `state.saved` is read from and written to a file.
 // All other state is ephemeral. First we load state.saved then initialize the app.
@@ -131,7 +128,8 @@ function onState (err, _state) {
   // Drag and drop files/text to start torrenting or seeding
   dragDrop('body', {
     onDrop: onOpen,
-    onDropText: onOpen
+    onDropText: onOpen,
+    onError
   })
 
   // ...same thing if you paste a torrent
@@ -175,17 +173,6 @@ function delayedInit () {
   // ...window visibility state.
   document.addEventListener('webkitvisibilitychange', onVisibilityChange)
   onVisibilityChange()
-
-  lazyLoadCast()
-}
-
-// Lazily loads Chromecast and Airplay support
-function lazyLoadCast () {
-  if (!Cast) {
-    Cast = require('./lib/cast')
-    Cast.init(state, update) // Search the local network for Chromecast and Airplays
-  }
-  return Cast
 }
 
 // React loop:
@@ -303,11 +290,6 @@ const dispatchHandlers = {
   mediaControlsMouseLeave: () => controllers.media().controlsMouseLeave(),
   openExternalPlayer: () => controllers.media().openExternalPlayer(),
   externalPlayerNotFound: () => controllers.media().externalPlayerNotFound(),
-
-  // Remote casting: Chromecast, Airplay, etc
-  toggleCastMenu: (deviceType) => lazyLoadCast().toggleMenu(deviceType),
-  selectCastDevice: (index) => lazyLoadCast().selectDevice(index),
-  stopCasting: () => lazyLoadCast().stop(),
 
   // Preferences screen
   preferences: () => controllers.prefs().show(),

@@ -1,16 +1,16 @@
 const crypto = require('crypto')
 
-// Keep LAN casting, but do not expose every file to browsers or network scans.
-function secureMediaServer (server, networkAddress) {
+// Token-authorized media is served only to the local app.
+function secureMediaServer (server) {
   const token = crypto.randomBytes(32).toString('hex')
   const prefix = '/' + token
   const handlers = server.listeners('request')
   server.removeAllListeners('request')
   server.on('request', (req, res) => {
     const port = server.address().port
-    const hosts = ['localhost', '127.0.0.1', networkAddress].map(host => host + ':' + port)
+    const hosts = ['localhost', '127.0.0.1'].map(host => host + ':' + port)
     const origin = req.headers.origin
-    const origins = ['null', 'https://www.gstatic.com', 'https://cast.google.com']
+    const origins = ['null']
     if (!hosts.includes(req.headers.host) || !req.url.startsWith(prefix + '/') ||
         (origin && !origins.includes(origin))) {
       res.writeHead(403)

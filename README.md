@@ -106,14 +106,14 @@ external tools such as the system FFmpeg installation.
 
 The React UI runs in sandboxed, isolated windows. A small preload exposes
 allowlisted application commands, requests and events. Filesystem operations and
-native dialogs run in the main process; torrent networking, casting discovery,
+native dialogs run in the main process; torrent networking,
 subtitle extraction and posters run in a utility process. IPC sender/frame checks
 and token-protected media endpoints remain in place.
 
-Legacy casting packages use `vendor/ip-compat` backed by `ipaddr.js`. Torrent
+Torrent discovery uses `vendor/ip-compat` backed by `ipaddr.js`. Torrent
 blocklists use `vendor/ip-set-compat` backed by Node's IPv4/IPv6 `BlockList`; this
 also avoids the upstream package's pnpm-only install script. Parser overrides
-keep legacy casting dependencies on patched XML/protobuf versions. Tests cover
+keep remaining dependencies on patched XML versions. Tests cover
 these compatibility APIs. See [SECURITY-AUDIT.md](SECURITY-AUDIT.md).
 
 ### Run all checks
@@ -132,7 +132,7 @@ security and integration checks.
 ### Architecture
 
 - `src/main/`: native windows, IPC, OS integration and atomic profile persistence.
-- `src/engine/`: utility-process torrent, casting and media processing services.
+- `src/engine/`: utility-process torrent and media processing services.
 - `src/renderer/`: browser-only React UI and scoped state subscriptions.
 - `src/shared/`: state model, shared helpers and IPC channel declarations.
 - `bin/build.js`: esbuild compilation, UI bundling and sandboxed preload bundles.
@@ -247,8 +247,14 @@ packets. Playback pauses during conversion and resumes at the same position.
 Copies are reused from `AudioCache` in the application configuration directory;
 original torrent files are never changed, so seeding is unaffected. The cache can
 be deleted while the app is closed to reclaim space. Conversion requires FFmpeg
-and FFprobe; failures offer the existing external-player fallback. Casting and
-external players continue to receive the original torrent stream.
+and FFprobe; failures offer the existing external-player fallback. External players continue to receive the original torrent stream.
+
+AirPlay, Chromecast and DLNA casting have been removed. Playback endpoints bind
+only to localhost. Drag and drop, SRT conversion, subtitle language labels and
+byte formatting use local implementations. Subtitle labels prefer filename
+language tags and use conservative text hints; ambiguous captions keep their
+filename. See [DEPENDENCY-MAINTENANCE.md](DEPENDENCY-MAINTENANCE.md) for the
+maintenance review and retained dependencies.
 
 ### Privacy
 

@@ -30,13 +30,13 @@ upstream WebTorrent builds or consume the old upstream update feed.
    but is not a substitute for Developer ID signing and notarization.
 4. Smoke-test the packaged application, including local torrent creation,
    streaming, seeking, embedded and external subtitles, pause/resume, preferences,
-   export, casting and OS integrations. The automated packaged smoke check is:
+   export, drag and drop, folder monitoring and OS integrations. The automated packaged smoke check is:
 
    ```sh
    WEBTORRENT_PACKAGED_APP="/absolute/path/to/WebTorrent.app/Contents/MacOS/WebTorrent" npm run test-integration
    ```
 
-   Physical casting and OS-specific integrations still need a device check.
+   OS-specific integrations still need a platform check.
    Verify downloads with Gatekeeper/SmartScreen on the actual target platform.
 5. Collect the current-version artifacts in `dist/`, run `npm run checksums`,
    then explicitly run `npm run release` to create a **draft** GitHub release

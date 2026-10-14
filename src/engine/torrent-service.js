@@ -5,7 +5,6 @@ const crypto = require('crypto')
 const util = require('util')
 const ipcRenderer = require('./transport')
 const fs = require('fs')
-const networkAddress = require('network-address')
 const path = require('path')
 let WebTorrent
 let NodeServer
@@ -14,10 +13,6 @@ const config = require('../config')
 const { TorrentKeyNotFoundError } = require('../shared/errors')
 const torrentPoster = require('./torrent-poster')
 const secureMediaServer = require('./secure-media-server')
-const Cast = require('./cast')
-const castState = require('../shared/state').createState()
-castState.saved = { torrents: [] }
-let castingInitialized = false
 
 /**
  * WebTorrent version.
@@ -91,18 +86,6 @@ async function init () {
       : require('./subtitles').readSubtitle(filePath)
     task.then(result => ipcRenderer.send('wt-subtitle-result-' + id, null, result),
       err => ipcRenderer.send('wt-subtitle-result-' + id, err.message))
-  })
-
-  ipcRenderer.on('wt-cast-command', (event, action, context, ...args) => {
-    const allowed = ['toggleMenu', 'selectDevice', 'stop', 'play', 'pause', 'seek', 'setVolume', 'setRate']
-    if (context) {
-      Object.assign(castState.playing, context.playing)
-      castState.server = context.server
-      castState.saved.torrents = context.torrents
-    }
-    if (!castingInitialized) { Cast.init(castState, publishCastState); castingInitialized = true }
-    if (allowed.includes(action)) Cast[action](...args)
-    publishCastState()
   })
 
   ipcRenderer.send('ipcReadyWebTorrent')
@@ -339,17 +322,14 @@ async function startServerFromReadyTorrent (torrent) {
   // listeners. Each playback session gets a fresh server and access token.
   server = new NodeServer(client)
   server.torrentInfoHash = torrent.infoHash
-  const address = networkAddress()
-  const listening = new Promise(resolve => server.listen(0, resolve))
-  const prefix = secureMediaServer(server.server, address)
+  const listening = new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const prefix = secureMediaServer(server.server)
   await listening
   const port = server.address().port
   const urlSuffix = ':' + port + prefix + '/webtorrent/' + torrent.infoHash
   const info = {
     torrentKey: torrent.key,
-    localURL: 'http://localhost' + urlSuffix,
-    networkURL: 'http://' + address + urlSuffix,
-    networkAddress: address
+    localURL: 'http://127.0.0.1' + urlSuffix
   }
   ipcRenderer.send('wt-server-running', info)
   ipcRenderer.send('wt-server-' + torrent.infoHash, info)
@@ -466,19 +446,3 @@ function reportError (error) {
 }
 
 init().catch(err => { reportError(err); process.exitCode = 1 })
-
-function publishCastState () {
-  const devices = {}
-  for (const type of ['chromecast', 'airplay', 'dlna']) {
-    const player = castState.devices[type]
-    if (!player) continue
-    const items = player.getDevices()
-    devices[type] = { items: items.map(device => ({ name: device.name })), selected: items.indexOf(player.device) }
-  }
-  ipcRenderer.send('wt-cast-state', {
-    playing: castState.playing,
-    devices,
-    menu: castState.devices.castMenu && { location: castState.devices.castMenu.location, devices: castState.devices.castMenu.devices.map(device => ({ name: device.name })) },
-    errors: castState.errors.splice(0)
-  })
-}

@@ -32,17 +32,13 @@ async function main () {
   assert.deepStrictEqual(plist.parse(plist.build({ title: 'test', enabled: true })), { title: 'test', enabled: true })
   const xml = require('xml2js')
   assert.strictEqual((await xml.parseStringPromise('<root><name>test</name></root>')).root.name[0], 'test')
-  const proto = require('castv2/lib/proto')
-  await new Promise(resolve => setTimeout(resolve, 100))
-  const message = { protocolVersion: 0, sourceId: 'sender', destinationId: 'receiver', namespace: 'urn:test', payloadType: 0, payloadUtf8: 'hello' }
-  assert.strictEqual(proto.CastMessage.parse(proto.CastMessage.serialize(message)).payloadUtf8, 'hello')
   const mm = await import('music-metadata')
   assert((await mm.parseFile(path.join(__dirname, 'resources/monitor-test.mp4'))).format.duration > 0)
 
   const server = http.createServer((req, res) => res.end(req.url))
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
-    const prefix = secureMediaServer(server, '127.0.0.1')
+    const prefix = secureMediaServer(server)
     const url = 'http://127.0.0.1:' + server.address().port
     assert.strictEqual((await fetch(url + '/0')).status, 403, 'a missing media token must be rejected')
     assert.strictEqual((await fetch(url + prefix + '/0', { headers: { Origin: 'https://evil.example' } })).status, 403)
@@ -54,7 +50,7 @@ async function main () {
     })
     assert.strictEqual(forgedHost, 403, 'DNS rebinding must be rejected')
     assert.strictEqual(await (await fetch(url + prefix + '/0', { headers: { Origin: 'null' } })).text(), '/0')
-    assert.strictEqual((await fetch(url + prefix + '/0', { headers: { Origin: 'https://www.gstatic.com' } })).status, 200, 'the default Cast receiver can fetch authorized media')
+    assert.strictEqual((await fetch(url + prefix + '/0', { headers: { Origin: 'https://www.gstatic.com' } })).status, 403, 'former casting origins are no longer allowed')
   } finally {
     await new Promise(resolve => server.close(resolve))
   }
@@ -71,7 +67,7 @@ async function main () {
     })
     torrentServer = client.createServer()
     const listening = new Promise(resolve => torrentServer.listen(0, '127.0.0.1', resolve))
-    const prefix = secureMediaServer(torrentServer.server, '127.0.0.1')
+    const prefix = secureMediaServer(torrentServer.server)
     await listening
     const url = 'http://127.0.0.1:' + torrentServer.address().port
     assert.strictEqual((await fetch(url + '/0')).status, 403)
@@ -204,7 +200,7 @@ async function main () {
     await page.evaluate(() => { window.location.href = 'https://example.com' })
     assert.strictEqual(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/main.html')).webContents.getURL()), beforeNavigation, 'remote navigation must be blocked')
 
-    console.log('Security checks passed: IP bypasses, blocklists, casting parsers, metadata, media authorization, real torrent streaming and ranges, DNS rebinding, isolated app startup, CSP, denied popups/navigation, forged IPC, preferences')
+    console.log('Security checks passed: IP bypasses, blocklists, metadata, media authorization, real torrent streaming and ranges, DNS rebinding, isolated app startup, CSP, denied popups/navigation, forged IPC, preferences')
   } catch (error) {
     if (page) {
       console.error(await page.evaluate(() => {

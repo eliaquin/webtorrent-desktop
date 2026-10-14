@@ -1,3 +1,11 @@
+## 0.27.0 — dependency cleanup
+
+- Remove AirPlay, Chromecast and DLNA discovery, controls and UI; bind playback streaming to localhost.
+- Upgrade bitfield to 5.0.1 and Chokidar to 5.0.0.
+- Replace drag/drop, subtitle language hints, SRT conversion and byte formatting with local implementations.
+- Remove 145 dependency packages and document the maintenance review and remaining migration candidates.
+- Add regression coverage for folder watching, drops, subtitle encodings and bitfield rendering.
+
 ## 0.25.0 — personal fork modernization
 
 - Upgrade WebTorrent to 3.0.21 and migrate torrent/casting/media work to a utility process.
