@@ -1,26 +1,19 @@
 <h1 align="center">
-  <br>
-  <a href="https://webtorrent.io">
-    <img src="https://webtorrent.io/img/WebTorrent.png" alt="WebTorrent" width="200">
-  </a>
-  <br>
-  WebTorrent Desktop
-  <br>
-  <br>
+  <img src="https://webtorrent.io/img/WebTorrent.png" alt="WebTorrent" width="160"><br>
+  WebTorrent Desktop · Eliaquin’s fork
 </h1>
 
-<h4 align="center">The streaming torrent app. For Mac, Windows, and Linux.</h4>
+<p align="center">Stream torrents while they download, with a refreshed library and expanded playback options.</p>
 
 <p align="center">
-  <a href="https://discord.gg/cnXkm4Z"><img src="https://img.shields.io/discord/612575111718895616" alt="discord"></a>
-  <a href="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml"><img src="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml/badge.svg" alt="GitHub CI action"></a>
-  <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/release/eliaquin/webtorrent-desktop.svg" alt="github release version"></a>
-  <a href="https://github.com/eliaquin/webtorrent-desktop/releases"><img src="https://img.shields.io/github/downloads/eliaquin/webtorrent-desktop/total.svg" alt="github release downloads"></a>
-  <a href="https://eslint.org"><img src="https://img.shields.io/badge/lint-ESLint_10-4B32C3.svg" alt="ESLint 10"></a>
+  <a href="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml"><img src="https://github.com/eliaquin/webtorrent-desktop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/eliaquin/webtorrent-desktop/releases/latest"><img src="https://img.shields.io/github/release/eliaquin/webtorrent-desktop.svg" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
-This is Eliaquin's personal fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
-with React 19, Electron 44 and WebTorrent 3. Original authorship and license are preserved.
+An independently maintained fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
+built on the work of WebTorrent, LLC and the [original contributors](AUTHORS.md).
+This fork focuses on the Mac experience, media playback and a modernized codebase.
 
 ## Download for Mac
 
@@ -29,331 +22,94 @@ with React 19, Electron 44 and WebTorrent 3. Original authorship and license are
 | Apple Silicon (M-series) | **[Download for Apple Silicon](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-arm64.dmg)** |
 | Intel | **[Download for Intel](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-x64.dmg)** |
 
-Open the DMG and drag **WebTorrent** into **Applications**. To update, quit
-WebTorrent and replace the existing app; your downloads and preferences stay in place.
+Open the DMG and drag **WebTorrent** into **Applications**. To update, quit the
+app and replace it; your downloads and preferences stay in place.
 
 [Release notes, ZIP downloads and checksums](https://github.com/eliaquin/webtorrent-desktop/releases/latest).
-These links always point to the latest published release and do not require a
-GitHub account. Windows and Linux can be built using the instructions below.
-Homebrew's `webtorrent` cask installs the upstream project, not this personal fork.
+These links always point to the latest published release; no GitHub account is needed.
+Homebrew’s `webtorrent` cask installs the upstream project.
 
-### Update notifications
+**Binary releases are macOS-only.** This fork does not generate, sign or distribute
+Windows or Linux binaries. Their platform code and local build tools remain
+available for anyone who wants to [compile from source](docs/DEVELOPMENT.md#package-locally).
 
-WebTorrent checks this repository's published releases at startup and every six
-hours. When a newer download is available for your computer, it offers **Download**,
-**Not now**, or **Skip this version**. Automatic prompts wait until you leave the
-player or close another dialog. Use **Check for Updates…** in the WebTorrent menu
-(Mac) or Help menu to check immediately, including versions you previously skipped.
-Downloads open in your browser; installation stays under your control.
+## What this fork adds
 
-Embedded subtitle extraction and video posters use system FFmpeg. On macOS,
-install it with `brew install ffmpeg`.
+- **Refreshed library and preferences:** responsive poster shelves, search and
+  status filters, per-file selection, visible stream/pause actions, and reorganized
+  settings and navigation.
+- **More playback options:** optional native VLC inside the app, plus the built-in
+  player and external-player support. VLC can be installed after WebTorrent and
+  detected without rebuilding or restarting.
+- **Better subtitles and audio:** embedded text subtitles, visible track selection,
+  subtitle language labels, optional FFmpeg setup, and cached AAC playback copies
+  for audio the built-in player cannot decode.
+- **Download-aware playback:** torrent progress in the player, improved download
+  resume, and recovery when a saved download location is missing.
+- **Update notifications:** checks at startup and every six hours, with **Download**,
+  **Not now** and **Skip this version**. Prompts wait until you leave the player or
+  close another dialog. **WebTorrent → Check for Updates…** checks on demand.
+  Downloads open in your browser for manual installation.
+- **Modernized internals:** React 19, Electron 44, WebTorrent 3, isolated sandboxed
+  UI windows, a separate torrent/media process, updated dependencies and expanded
+  automated tests.
+- **Mac release automation:** patch versions, Intel and Apple Silicon builds,
+  Developer ID signing, Apple notarization and permanent latest-download links.
 
-### Optional native video player (macOS, experimental)
+AirPlay, Chromecast and DLNA casting have been removed from this fork.
 
-Both video players are available. The built-in Chromium player remains the default.
-To try libVLC **inside the WebTorrent window**, install VLC 3 in Applications,
-then choose **Preferences → Playback → Video player → Native VLC
-(experimental)**. The setting is saved and applies to the next video you open.
-It is independent of the option to open media in an external app.
-VLC can be installed after WebTorrent. Open Preferences or return to its window
-after installation to refresh detection; no rebuild or restart is needed.
+## Playback setup
 
-Native playback uses VLC's decoders and video output directly, including torrent
-HTTP streaming, embedded/loaded subtitles, audio tracks, seeking, volume and speed.
-No compatible copy or audio conversion is needed. If the native player cannot
-start, WebTorrent displays the reason and uses the built-in player for that video.
-Seek previews show the time; thumbnail previews remain available in the built-in player.
+The built-in player is the default. For native VLC playback, install **VLC 3** in
+Applications and select **Preferences → Playback → Video player → Native VLC
+(experimental)**. This requires macOS 13+ and VLC matching the app’s architecture.
+Keep VLC installed: its libraries are loaded from your VLC installation. After
+installing it, open Preferences or return to the app window to refresh detection.
+If native playback cannot start, the app explains why and uses the built-in player.
 
-The first native implementation supports macOS 13+ with a matching arm64 or x64
-VLC 3 installation. VLC's libraries/plugins are loaded from VLC.app and are not
-bundled; keep VLC installed. Windows and Linux continue to use the existing players.
-Building the optional bridge needs Apple's command line tools (`clang++`); `npm run
-build` always compiles it using Node-API headers and the pinned libVLC headers in
-`native/vendor/libvlc`; VLC is not required on the build machine. A custom
-VLC runtime can be supplied through `WEBTORRENT_VLC_PATH` (the `Contents/MacOS`
-directory). Native modules are unpacked when packaging the Electron application.
-
-Run `npm run test-native-player` for session/authorization checks and `npm run
-test-native-integration` on a Mac with VLC and FFmpeg for actual torrent playback,
-controls, subtitles, fullscreen and teardown checks.
-
-## How to Contribute
-
-### Get the code
-
-Use Node.js 24 LTS (or Node.js 22.12+). Node.js 16 and 18 are no longer supported.
-
-```
-$ git clone https://github.com/eliaquin/webtorrent-desktop.git
-$ cd webtorrent-desktop
-$ npm ci
-```
-
-### Run the app
-
-```
-$ npm start
-```
-
-### Watch the code
-
-Restart the app automatically every time code changes. Useful during development.
-
-```
-$ npm run watch
-```
-
-### Run linters
-
-```
-$ npm test
-```
-
-### Security checks
-
-```
-$ npm run audit
-$ npm run test-security
-$ npm run test-subtitles
-```
-
-Subtitle tests require FFmpeg. Linux CI runs Electron tests under Xvfb.
-
-The dependency audit was reduced from 67 affected packages (including five
-critical) to zero known advisories on October 7, 2026. This includes development
-and optional dependencies. npm advisories do not cover every possible bug or
-external tools such as the system FFmpeg installation.
-
-The React UI runs in sandboxed, isolated windows. A small preload exposes
-allowlisted application commands, requests and events. Filesystem operations and
-native dialogs run in the main process; torrent networking,
-subtitle extraction and posters run in a utility process. IPC sender/frame checks
-and token-protected media endpoints remain in place.
-
-Torrent discovery uses `vendor/ip-compat` backed by `ipaddr.js`. Torrent
-blocklists use `vendor/ip-set-compat` backed by Node's IPv4/IPv6 `BlockList`; this
-also avoids the upstream package's pnpm-only install script. Parser overrides
-keep remaining dependencies on patched XML versions. Tests cover
-these compatibility APIs. See [SECURITY-AUDIT.md](SECURITY-AUDIT.md).
-
-### Run all checks
+Embedded subtitle extraction, video posters and built-in-player audio conversion
+use **FFmpeg/FFprobe**. The subtitle menu offers optional setup; with Homebrew:
 
 ```sh
-npm run test-all
+brew install ffmpeg
 ```
 
-Tests cover store subscriptions, local TCP peers and verified resume, security,
-React component interactions, subtitle conversion/races, and the full packaged
-app flow through Playwright. Integration tests create local media and temporary
-profiles; they do not depend on public torrents or screen-specific golden images.
-Linux CI uses Xvfb. `WEBTORRENT_PACKAGED_APP` can target a packaged executable for
-security and integration checks.
+For the built-in player, embedded text subtitles and audio conversion become
+available after the selected file finishes downloading. Image subtitles and full
+ASS styling are not supported by WebVTT conversion. Audio conversion preserves
+the original torrent files for seeding. [Playback details](docs/DEVELOPMENT.md#playback-checks-and-dependencies).
 
-### Architecture
+## Build and contribute
 
-- `src/main/`: native windows, IPC, OS integration and atomic profile persistence.
-- `src/engine/`: utility-process torrent and media processing services.
-- `src/renderer/`: browser-only React UI and scoped state subscriptions.
-- `src/shared/`: state model, shared helpers and IPC channel declarations.
-- `bin/build.js`: esbuild compilation, UI bundling and sandboxed preload bundles.
+Use Node.js 24 LTS (or 22.13+) and npm 10+:
 
-UI state belongs to a private store. Components subscribe to the branches they
-use; download progress does not rerender the preferences page. Media DOM updates
-run after React commits, with playback events driving progress and volume.
-
-The library uses a responsive media shelf with poster previews, search, status
-filters and visible stream/pause controls. Open a poster or its Files button to
-choose individual files; More actions opens the native torrent menu. Add torrent
-accepts magnet links and torrent addresses or opens the native torrent-file picker.
-Search and filters are local to the library view and reset when leaving it.
-
-Usage diagnostics remain local and bounded in memory; crash uploads are disabled.
-Update checks use this fork's GitHub releases and require manual installation.
-
-### Cleanup
-
-`npm run clean` removes only generated build files. Downloads, saved settings and
-build backups are preserved. An intentional profile reset requires quitting the
-app and running `npm run reset-app -- --confirm-profile-reset`.
-
-### Package the app
-
-Builds app binaries for Mac, Linux, and Windows.
-
-```
-$ npm run package
+```sh
+git clone https://github.com/eliaquin/webtorrent-desktop.git
+cd webtorrent-desktop
+npm ci
+npm start
 ```
 
-To build for one platform:
+See [development and local packaging](docs/DEVELOPMENT.md),
+[Mac release automation](docs/RELEASING.md),
+[security architecture](SECURITY-AUDIT.md) and
+[dependency maintenance](DEPENDENCY-MAINTENANCE.md).
+Please report issues with this fork in [this repository](https://github.com/eliaquin/webtorrent-desktop/issues).
 
-```
-$ npm run package -- [platform] [options]
-```
+## Privacy
 
-Where `[platform]` is `darwin`, `linux`, `win32`, or `all` (default).
+Usage diagnostics stay local and bounded in memory; crash report uploads are
+disabled. Update checks contact GitHub for this repository’s releases. Torrent
+networking still connects to peers and trackers; local media endpoints bind only
+to localhost.
 
-The following optional arguments are available:
+## Credits and license
 
-- `--sign` - Sign the application (Mac, Windows)
-- `--package=[type]` - Package single output type.
-   - `deb` - Debian package
-   - `rpm` - RedHat package
-   - `zip` - Linux zip file
-   - `dmg` - Mac disk image
-   - `exe` - Windows installer
-   - `portable` - Windows portable app
-   - `all` - All platforms (default)
+Based on [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop)
+by **WebTorrent, LLC**, Feross Aboukhadijeh and the many contributors listed in
+[AUTHORS.md](AUTHORS.md). Their authorship, copyright notices and contribution
+history are preserved. This fork is maintained by [Eliaquin](https://github.com/eliaquin)
+and is independent of the upstream project.
 
-Note: Even with the `--package` option, the auto-update files (.nupkg for Windows,
--darwin.zip for Mac) will always be produced.
-
-#### Windows build notes
-
-The Windows app can be packaged from **any** platform.
-
-Note: Windows code signing only works from **Windows**, for now.
-
-Note: To package the Windows app from non-Windows platforms,
-[Wine](https://www.winehq.org/) and [Mono](https://www.mono-project.com/) need
-to be installed. For example on Mac, first install
-[XQuartz](http://www.xquartz.org/), then run:
-
-```
-$ brew install wine mono
-```
-
-(Requires the [Homebrew](http://brew.sh/) package manager.)
-
-#### Mac build notes
-
-##### Automated releases
-
-Application, dependency and build changes pushed to `main` start **Prepare patch
-release**. After the full CI suite passes, it increments the patch version in
-`package.json` and `package-lock.json`, commits that version to `main`, and starts
-**Publish signed Mac release**. That workflow builds both Mac architectures and
-publishes the GitHub release only after notarization, Gatekeeper verification and
-checksum validation. Documentation-only changes do not create a release.
-
-If Apple is still processing, the release stays a draft. A scheduled workflow
-checks pending releases every 30 minutes (subject to GitHub scheduling delays)
-and resumes their saved submissions automatically. Public releases include stable
-installer filenames for the README links as well as versioned installers, ZIPs
-and `SHA256SUMS.txt`. The in-app update checker uses only published stable releases
-with a compatible download, never drafts or CI artifacts.
-
-To start a patch release manually, run **Prepare patch release** on `main` or
-`npm run release`. Minor or major version changes remain an explicit maintainer
-decision. Failed builds remain private drafts; fix and rerun the original failed
-job before resuming a draft that lacks recovery artifacts.
-
-##### Manual Mac builds
-
-Signed builds require `APPLE_SIGNING_IDENTITY` and an `APPLE_NOTARY_PROFILE`
-created with `xcrun notarytool store-credentials`. Unsigned local builds do not
-require Apple credentials.
-
-Run **Actions → Signed macOS builds → Run workflow** on `main` to produce separate
-Apple Silicon (`arm64`) and Intel (`x64`) DMG/ZIP downloads. The general `package`
-workflow uses the same signed Mac jobs. Each app is signed with Developer ID,
-notarized, stapled, and verified with Gatekeeper before packaging. Downloads are
-available in the workflow's artifacts for 30 days; publishing a GitHub release
-is a separate action.
-
-Apple's processing can outlast a CI job. The workflow saves the signed app and
-submission ID first as `macos-ARCH-notarization-pending`, then waits up to five
-minutes. A successful workflow with a **Pending Apple approval** summary means
-the submission was saved, not that the installers are ready. Pending artifacts
-are recovery files and must not be distributed as approved installers.
-
-To check again, run **Signed macOS builds** on `main` and enter the original
-workflow run ID in **resume_run_id** (the number in the run's URL). This restores
-the exact signed app and checks the same Apple submission without rebuilding or
-resubmitting it. Once accepted, the workflow staples and verifies it, then uploads
-`macos-arm64-signed` and `macos-x64-signed` with DMG/ZIP downloads. Resume within
-the 30-day artifact retention period. Apple rejections fail the job and include
-diagnostics; delays leave the submission pending for another resume. Runs from
-before this recovery mechanism cannot be resumed because they saved no app.
-
-Configure these repository Actions secrets (never commit their contents):
-
-| Secret | Value |
-| --- | --- |
-| `APPLE_CERTIFICATE_BASE64` | Base64-encoded PKCS#12 (`.p12`) containing the Developer ID Application certificate and private key |
-| `APPLE_CERTIFICATE_PASSWORD` | Password protecting that PKCS#12 file |
-| `APPLE_SIGNING_IDENTITY` | Full `Developer ID Application: … (TEAMID)` certificate identity |
-| `APPLE_API_KEY_BASE64` | Base64-encoded App Store Connect team API private key (`.p8`) |
-| `APPLE_API_KEY_ID` | App Store Connect API key ID |
-| `APPLE_API_ISSUER` | App Store Connect API issuer ID |
-
-Use a dedicated App Store Connect team key with App Manager access for
-notarization. Signing is restricted to this repository's `main` branch and is
-never triggered by pull requests. Each job uses an ephemeral password-protected
-keychain and removes the keychain and temporary credential files even on failure.
-The downloaded app contains Apple's notarization ticket, not signing credentials.
-For local signing with a separate keychain, also set `APPLE_KEYCHAIN` to its path.
-
-The Mac app can only be packaged from **macOS**.
-
-#### Linux build notes
-
-The Linux app can be packaged from **any** platform.
-
-If packaging from Mac, install system dependencies with Homebrew by running:
-
-```
-npm run install-system-deps
-```
-#### Recommended readings to start working in the app
-
-Electron (Framework to make native apps for Windows, OSX and Linux in Javascript):
-https://electronjs.org/docs/tutorial/quick-start
-
-React.js (Framework to work with Frontend UI):
-https://react.dev/learn
-
-Linting uses ESLint 10 with ESLint Stylistic and maintained React, import, Node and
-Promise plugins. `npm test` checks code and style; `npm run test-maintenance`
-checks navigation, VLC discovery, archive preservation and the lint configuration.
-Node 24 is recommended (Node 22 requires 22.13 or later).
-
-UI controls are local React components backed by native HTML controls in
-`src/renderer/components/ui/`, styled in `static/main.css`. No component framework
-or theme provider is required.
-
-Embedded text subtitles (including ASS/SSA in MKV files) are extracted to WebVTT
-when the playing file has finished downloading. This requires `ffmpeg` and
-`ffprobe` on PATH; macOS builds also look in the standard Homebrew locations.
-On macOS, install them with `brew install ffmpeg`. Image subtitles such as PGS
-and VobSub are not supported. WebVTT conversion preserves text and timing, but
-does not reproduce ASS fonts, positioning, or animation.
-
-Videos whose audio Chromium cannot decode (such as AC-3) are checked with
-`ffprobe` once the selected file finishes downloading. When audio is present,
-FFmpeg creates a compatible playback copy with AAC audio and the original video
-packets. Playback pauses during conversion and resumes at the same position.
-Copies are reused from `AudioCache` in the application configuration directory;
-original torrent files are never changed, so seeding is unaffected. The cache can
-be deleted while the app is closed to reclaim space. Conversion requires FFmpeg
-and FFprobe; failures offer the existing external-player fallback. External players continue to receive the original torrent stream.
-
-AirPlay, Chromecast and DLNA casting have been removed. Playback endpoints bind
-only to localhost. Drag and drop, SRT conversion, subtitle language labels and
-byte formatting use local implementations. Subtitle labels prefer filename
-language tags and use conservative text hints; ambiguous captions keep their
-filename. See [DEPENDENCY-MAINTENANCE.md](DEPENDENCY-MAINTENANCE.md) for the
-maintenance review and retained dependencies.
-
-### Privacy
-
-WebTorrent Desktop collects some basic usage stats to help us make the app better.
-For example, we track how well the play button works. How often does it succeed?
-Time out? Show a missing codec error?
-
-The app never sends any personally identifying information, nor does it track which
-torrents you add.
-
-## License
-
-MIT. Copyright (c) [WebTorrent, LLC](https://webtorrent.io).
+[MIT License](LICENSE). Copyright (c) WebTorrent, LLC.
+Third-party components retain their respective licenses and notices.
