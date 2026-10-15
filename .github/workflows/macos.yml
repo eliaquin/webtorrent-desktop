@@ -23,7 +23,9 @@ jobs:
     # Signing credentials are only available to manually requested main builds.
     if: github.repository == 'eliaquin/webtorrent-desktop' && github.ref == 'refs/heads/main'
     name: Signed macOS / ${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
+    # Recovery verifies an existing signed app without executing its binaries.
+    # Use Apple Silicon hosts for both archives to avoid Intel runner ticket-service failures.
+    runs-on: ${{ inputs.resume_run_id && 'macos-15' || matrix.runner }}
     timeout-minutes: 45
     env:
       RESUME_RUN_ID: ${{ inputs.resume_run_id || '' }}
