@@ -14,11 +14,10 @@ release**. After the full CI suite passes, it increments the patch version in
 publishes the GitHub release only after notarization, Gatekeeper verification and
 checksum validation. Documentation-only changes do not create a release.
 
-For a build-only delivery, include `[skip release]` in the pushed commit message.
-Normal CI still runs; automatic versioning and publication are skipped. Dispatch
-**Signed macOS builds** manually to produce signed workflow artifacts without a
-public release. Increment the version locally before pushing if the build needs
-a new version number.
+Merging or pushing these changes to `main` authorizes the full build and release
+pipeline, including artifact uploads and public GitHub publication, without a
+separate confirmation. Commit messages do not opt out of release automation.
+See [AGENTS.md](../AGENTS.md) for the repository's standing delivery instructions.
 
 If Apple is still processing, the release stays a draft. A scheduled workflow
 checks pending releases every 30 minutes (subject to GitHub scheduling delays)
