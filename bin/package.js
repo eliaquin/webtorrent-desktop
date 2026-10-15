@@ -264,59 +264,7 @@ function buildDarwin (cb) {
     }
 
     function signApp (cb) {
-      const sign = require('@electron/osx-sign')
-      const { notarize } = require('@electron/notarize')
-
-      /*
-       * Sign the app with Apple Developer ID certificates. We sign the app for 2 reasons:
-       *   - So the auto-updater (Squirrrel.Mac) can check that app updates are signed by
-       *     the same author as the current version.
-       *   - So users will not a see a warning about the app coming from an "Unidentified
-       *     Developer" when they open it for the first time (Mac Gatekeeper).
-       *
-       * To sign an Mac app for distribution outside the App Store, the following are
-       * required:
-       *   - Xcode
-       *   - Xcode Command Line Tools (xcode-select --install)
-       *   - Membership in the Apple Developer Program
-       */
-      const hasNativePlayer = ['arm64', 'x64'].some(arch => fs.existsSync(path.join(appPath, 'Contents/Resources/app.asar.unpacked/build/native', `vlc-${arch}.node`)))
-      const signOpts = {
-        app: appPath,
-        platform: 'darwin',
-        identity: process.env.APPLE_SIGNING_IDENTITY,
-        optionsForFile: filePath => ({
-          hardenedRuntime: true,
-          // Only the main app may load another team's VLC plugins. Renderer and
-          // networking helpers retain the original library validation policy.
-          entitlements: path.join(config.ROOT_PATH, 'bin', hasNativePlayer &&
-            [appPath, path.join(appPath, 'Contents/MacOS', config.APP_NAME)].includes(filePath)
-            ? 'darwin-native-player-entitlements.plist'
-            : 'darwin-entitlements.plist')
-        })
-      }
-      const notarizeOpts = {
-        appPath,
-        keychainProfile: process.env.APPLE_NOTARY_PROFILE
-      }
-      if (!signOpts.identity || !notarizeOpts.keychainProfile) {
-        return cb(new Error('--sign requires APPLE_SIGNING_IDENTITY and APPLE_NOTARY_PROFILE'))
-      }
-
-      console.log('Mac: Signing app...')
-      sign.sign(signOpts).then(function () {
-        console.log('Mac: Signed app.')
-
-        console.log('Mac: Notarizing app...')
-        notarize(notarizeOpts).then(
-          function () {
-            console.log('Mac: Notarized app.')
-            cb(null)
-          },
-          function (err) {
-            cb(err)
-          })
-      }).catch(cb)
+      require('./macos-signing').signAndNotarize(appPath).then(() => cb(null), cb)
     }
 
     function pack (cb) {
@@ -594,7 +542,10 @@ function buildLinux (cb) {
 }
 
 function printDone (err) {
-  if (err) console.error(err.message || err)
+  if (err) {
+    console.error(err.message || err)
+    process.exitCode = 1
+  }
 }
 
 /*

@@ -1,0 +1,57 @@
+name: Signed macOS builds
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Signing credentials are only available to manually requested main builds.
+    if: github.repository == 'eliaquin/webtorrent-desktop' && github.ref == 'refs/heads/main'
+    name: Signed macOS / ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test && node test/macos-signing.js && npm run test-native-player
+      - name: Import signing and notarization credentials
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: bash bin/ci-macos-keychain.sh prepare
+      - name: Build, sign, notarize and verify
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: npm run package -- darwin --arch "${{ matrix.arch }}" --package dmg --sign
+      - name: Remove signing credentials
+        if: always()
+        run: bash bin/ci-macos-keychain.sh cleanup
+      - run: npm run checksums
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-${{ matrix.arch }}-signed
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*-darwin-${{ matrix.arch }}.dmg
+            dist/*-darwin-${{ matrix.arch }}.zip
+            dist/*SHA256SUMS.txt

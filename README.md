@@ -213,6 +213,31 @@ Signed builds require `APPLE_SIGNING_IDENTITY` and an `APPLE_NOTARY_PROFILE`
 created with `xcrun notarytool store-credentials`. Unsigned local builds do not
 require Apple credentials.
 
+Run **Actions → Signed macOS builds → Run workflow** on `main` to produce separate
+Apple Silicon (`arm64`) and Intel (`x64`) DMG/ZIP downloads. The general `package`
+workflow uses the same signed Mac jobs. Each app is signed with Developer ID,
+notarized, stapled, and verified with Gatekeeper before packaging. Downloads are
+available in the workflow's artifacts for 30 days; publishing a GitHub release
+is a separate action.
+
+Configure these repository Actions secrets (never commit their contents):
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CERTIFICATE_BASE64` | Base64-encoded PKCS#12 (`.p12`) containing the Developer ID Application certificate and private key |
+| `APPLE_CERTIFICATE_PASSWORD` | Password protecting that PKCS#12 file |
+| `APPLE_SIGNING_IDENTITY` | Full `Developer ID Application: … (TEAMID)` certificate identity |
+| `APPLE_API_KEY_BASE64` | Base64-encoded App Store Connect team API private key (`.p8`) |
+| `APPLE_API_KEY_ID` | App Store Connect API key ID |
+| `APPLE_API_ISSUER` | App Store Connect API issuer ID |
+
+Use a dedicated App Store Connect team key with App Manager access for
+notarization. Signing is restricted to this repository's `main` branch and is
+never triggered by pull requests. Each job uses an ephemeral password-protected
+keychain and removes the keychain and temporary credential files even on failure.
+The downloaded app contains Apple's notarization ticket, not signing credentials.
+For local signing with a separate keychain, also set `APPLE_KEYCHAIN` to its path.
+
 The Mac app can only be packaged from **macOS**.
 
 #### Linux build notes
