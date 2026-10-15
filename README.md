@@ -22,11 +22,29 @@
 This is Eliaquin's personal fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
 with React 19, Electron 44 and WebTorrent 3. Original authorship and license are preserved.
 
-## Install
+## Download for Mac
 
-Download this fork's builds from [its GitHub releases](https://github.com/eliaquin/webtorrent-desktop/releases)
-when a release is available, or build locally using the instructions below.
+| Your Mac | Latest signed and notarized installer |
+| --- | --- |
+| Apple Silicon (M-series) | **[Download for Apple Silicon](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-arm64.dmg)** |
+| Intel | **[Download for Intel](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-x64.dmg)** |
+
+Open the DMG and drag **WebTorrent** into **Applications**. To update, quit
+WebTorrent and replace the existing app; your downloads and preferences stay in place.
+
+[Release notes, ZIP downloads and checksums](https://github.com/eliaquin/webtorrent-desktop/releases/latest).
+These links always point to the latest published release and do not require a
+GitHub account. Windows and Linux can be built using the instructions below.
 Homebrew's `webtorrent` cask installs the upstream project, not this personal fork.
+
+### Update notifications
+
+WebTorrent checks this repository's published releases at startup and every six
+hours. When a newer download is available for your computer, it offers **Download**,
+**Not now**, or **Skip this version**. Automatic prompts wait until you leave the
+player or close another dialog. Use **Check for Updates…** in the WebTorrent menu
+(Mac) or Help menu to check immediately, including versions you previously skipped.
+Downloads open in your browser; installation stays under your control.
 
 Embedded subtitle extraction and video posters use system FFmpeg. On macOS,
 install it with `brew install ffmpeg`.
@@ -208,6 +226,29 @@ $ brew install wine mono
 (Requires the [Homebrew](http://brew.sh/) package manager.)
 
 #### Mac build notes
+
+##### Automated releases
+
+Application, dependency and build changes pushed to `main` start **Prepare patch
+release**. After the full CI suite passes, it increments the patch version in
+`package.json` and `package-lock.json`, commits that version to `main`, and starts
+**Publish signed Mac release**. That workflow builds both Mac architectures and
+publishes the GitHub release only after notarization, Gatekeeper verification and
+checksum validation. Documentation-only changes do not create a release.
+
+If Apple is still processing, the release stays a draft. A scheduled workflow
+checks pending releases every 30 minutes (subject to GitHub scheduling delays)
+and resumes their saved submissions automatically. Public releases include stable
+installer filenames for the README links as well as versioned installers, ZIPs
+and `SHA256SUMS.txt`. The in-app update checker uses only published stable releases
+with a compatible download, never drafts or CI artifacts.
+
+To start a patch release manually, run **Prepare patch release** on `main` or
+`npm run release`. Minor or major version changes remain an explicit maintainer
+decision. Failed builds remain private drafts; fix and rerun the original failed
+job before resuming a draft that lacks recovery artifacts.
+
+##### Manual Mac builds
 
 Signed builds require `APPLE_SIGNING_IDENTITY` and an `APPLE_NOTARY_PROFILE`
 created with `xcrun notarytool store-credentials`. Unsigned local builds do not

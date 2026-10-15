@@ -841,5 +841,26 @@ async function runUI (projectRoot) {
   assert.deepStrictEqual(events.pop(), ['checkSubtitleTools'])
   state.location.url = () => 'preferences'
   await render(h(App, { store }))
+  const release = { id: 'update-available-modal', status: 'available', version: '0.27.3', directDownload: true }
+  await act(async () => { state.modal = { ...release } })
+  assert(document.querySelector('[role=dialog]').textContent.includes('A new version is available'))
+  await click(button('Download'))
+  assert.deepStrictEqual(events.pop(), ['downloadUpdate'])
+  await click(button('Skip this version'))
+  assert.deepStrictEqual(events.pop(), ['skipVersion', '0.27.3'])
+  await click(button('Not now'))
+  assert.strictEqual(state.modal, null)
+  for (const [status, title] of [['checking', 'Checking for updates'], ['current', 'No updates available'], ['error', 'Couldn’t check for updates']]) {
+    await act(async () => { state.modal = { id: 'update-available-modal', status } })
+    assert(document.querySelector('[role=dialog]').textContent.includes(title))
+  }
+  events.length = 0
+  await click(button('Try again'))
+  assert.deepStrictEqual(events, [['exitModal'], ['checkForUpdates']])
+  await act(async () => { state.modal = { ...release, opening: true } })
+  assert(button('Opening…').disabled)
+  await act(async () => { state.modal = { ...release, downloadError: true } })
+  assert(document.querySelector('[role=alert]').textContent.includes('Couldn’t open the download'))
+  await act(async () => { state.modal = { ...release } })
   return 'UI tests passed: media shelf filters/search, live status updates, original file indices, stream/pause controls, file picker, empty/missing-folder states, native controls, preferences, torrent creation, modals and subtitle controls'
 }

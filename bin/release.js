@@ -1,10 +1,5 @@
-const fs = require('fs')
-const path = require('path')
 const { execFileSync } = require('child_process')
-const version = require('../package.json').version
-const prefix = 'WebTorrent-v' + version + '-'
 
-// Run explicitly after merging, tagging and validating distribution builds.
-const artifacts = fs.readdirSync('dist').filter(name => name.startsWith(prefix) && /\.(zip|dmg|exe|deb|rpm|nupkg|txt)$/.test(name)).map(name => path.join('dist', name))
-if (!artifacts.length) throw new Error('No artifacts for v' + version + '; run the package and checksums commands first')
-execFileSync('gh', ['release', 'create', 'v' + version, '--repo', 'eliaquin/webtorrent-desktop', '--draft', '--generate-notes', '--verify-tag', ...artifacts], { stdio: 'inherit' })
+// The workflow validates main, increments its patch version and publishes only
+// after both signed Mac builds pass notarization and Gatekeeper verification.
+execFileSync('gh', ['workflow', 'run', 'release-version.yml', '--repo', 'eliaquin/webtorrent-desktop', '--ref', 'main'], { stdio: 'inherit' })

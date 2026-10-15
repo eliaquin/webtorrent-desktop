@@ -103,6 +103,7 @@ async function main () {
     if (!page) page = await application.waitForEvent('window', { predicate: page => page.url().endsWith('/main.html') })
     await page.waitForSelector('.app')
     await page.waitForFunction(() => document.querySelector('.torrent')?.textContent.includes('Downloading'))
+    await testUpdateNotification(application, page)
     await testTorrentAddressDialog(application, page)
     assert(!(await page.locator('.torrent').innerText()).includes('Path missing'), 'startup can resume metadata before any data file exists')
     await page.getByRole('button', { name: 'Pause torrent' }).click()
@@ -315,6 +316,39 @@ async function testTorrentAddressDialog (application, page) {
     await application.evaluate(({ clipboard }) => {
       clipboard.readText = globalThis.testOriginalClipboardRead
       delete globalThis.testOriginalClipboardRead
+    })
+  }
+}
+
+async function testUpdateNotification (application, page) {
+  await application.evaluate(({ app, shell }) => {
+    const fromProject = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json')
+    const updater = fromProject('./build/main/updater')
+    globalThis.updateTestOriginal = { check: updater.check, open: shell.openExternal }
+    updater.check = async () => ({ status: 'available', version: '9.9.9', directDownload: true, downloadURL: 'https://github.com/eliaquin/webtorrent-desktop/releases/download/v9.9.9/WebTorrent-v9.9.9-darwin-arm64.dmg' })
+    shell.openExternal = async url => { globalThis.updateTestURL = url }
+  })
+  try {
+    await application.evaluate(({ Menu }) => {
+      const items = Menu.getApplicationMenu().items.flatMap(item => item.submenu?.items || [])
+      const check = items.find(item => item.label === 'Check for Updates…')
+      if (!check) throw new Error('Update menu item is missing')
+      check.click()
+    })
+    await page.getByRole('heading', { name: 'A new version is available' }).waitFor()
+    assert((await page.locator('[role=dialog]').innerText()).includes('9.9.9'))
+    if (process.env.UPDATE_SCREENSHOT_PATH) await page.screenshot({ path: process.env.UPDATE_SCREENSHOT_PATH })
+    await page.getByRole('button', { name: 'Download', exact: true }).click()
+    await page.locator('[role=dialog]').waitFor({ state: 'detached' })
+    assert((await application.evaluate(() => globalThis.updateTestURL)).endsWith('-arm64.dmg'))
+  } finally {
+    await application.evaluate(({ app, shell }) => {
+      const fromProject = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json')
+      const updater = fromProject('./build/main/updater')
+      updater.check = globalThis.updateTestOriginal.check
+      shell.openExternal = globalThis.updateTestOriginal.open
+      delete globalThis.updateTestOriginal
+      delete globalThis.updateTestURL
     })
   }
 }

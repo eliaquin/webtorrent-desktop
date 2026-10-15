@@ -4,7 +4,7 @@ const fs = require('fs')
 function validateRun (run, repository) {
   if (run.head_repository?.full_name !== repository || run.head_branch !== 'main' ||
       run.event !== 'workflow_dispatch' ||
-      !['.github/workflows/macos.yml', '.github/workflows/package.yml'].includes(run.path) ||
+      !['.github/workflows/macos.yml', '.github/workflows/package.yml', '.github/workflows/release.yml'].includes(run.path) ||
       !/^[a-f0-9]{40}$/i.test(run.head_sha)) {
     throw new Error('Only signed build artifacts from a manually requested main build in this repository can be resumed')
   }

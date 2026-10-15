@@ -31,6 +31,7 @@ function init () {
     if (trustedSender(event) && typeof text === 'string') clipboard.writeText(text)
   })
   handle('native:load-state', async () => (await require('./state').load()).saved)
+  handle('native:check-updates', () => require('./updater').check())
   handle('native:save-state', saved => require('./state').saveImmediate({ saved }))
   handle('native:stat-path', async filepath => {
     const stat = await fs.stat(filepath)

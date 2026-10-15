@@ -180,6 +180,7 @@ function delayedInit () {
 // 3. dispatch - the event handler calls dispatch(), main.js sends it to a controller
 // 4. controller - the controller handles the event, changing the state object
 function update () {
+  controllers.update().maybeShow()
   controllers.playback().showOrHidePlayerControls()
   controllers.subtitles().checkForEmbeddedSubtitles()
   controllers.media().checkAudioSupport()
@@ -298,12 +299,17 @@ const dispatchHandlers = {
   startFolderWatcher: () => controllers.folderWatcher().start(),
   stopFolderWatcher: () => controllers.folderWatcher().stop(),
 
-  // Update (check for new versions on Linux, where there's no auto updater)
-  updateAvailable: (version) => controllers.update().updateAvailable(version),
+  // Release notifications on every platform; downloading remains explicit.
+  updateAvailable: update => controllers.update().updateAvailable(update),
+  checkForUpdates: () => controllers.update().checkForUpdates(),
+  downloadUpdate: () => controllers.update().download(),
   skipVersion: (version) => controllers.update().skipVersion(version),
 
   // Navigation between screens (back, forward, ESC, etc)
-  exitModal: () => { state.modal = null },
+  exitModal: () => {
+    if (state.modal?.id === 'update-available-modal') controllers.update().dismiss()
+    else state.modal = null
+  },
   backToList,
   escapeBack,
   back: () => state.location.back(),

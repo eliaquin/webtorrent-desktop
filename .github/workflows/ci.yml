@@ -1,5 +1,8 @@
 name: ci
-on: [push,pull_request]
+on:
+  push:
+  pull_request:
+  workflow_call:
 permissions:
   contents: read
 
@@ -24,6 +27,7 @@ jobs:
       - run: npm test
       - run: node test/macos-signing.js
       - run: node test/macos-notarization.js
+      - run: node test/updater.js && node test/release-automation.js
       - run: node test/command-line.js
       - run: npm run test-maintenance
       - run: npm run test-cleanup

@@ -1,0 +1,63 @@
+name: Publish signed Mac release
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: publish-signed-mac-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'eliaquin/webtorrent-desktop' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      build: ${{ steps.release.outputs.build }}
+      source_ref: ${{ steps.release.outputs.source_ref }}
+      version: ${{ steps.release.outputs.version }}
+      resume_run_id: ${{ steps.release.outputs.resume_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Prepare release or resume pending notarization
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node bin/release-automation.js prepare
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    uses: ./.github/workflows/macos.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.source_ref }}
+      resume_run_id: ${{ needs.prepare.outputs.resume_run_id }}
+    secrets: inherit
+  publish:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Verify checksums and publish approved installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_ref }}
+        run: node bin/release-automation.js publish

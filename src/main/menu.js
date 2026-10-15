@@ -294,6 +294,10 @@ function getMenuTemplate () {
       role: 'help',
       submenu: [
         {
+          label: 'Check for Updates…',
+          click: () => windows.main.dispatch('checkForUpdates')
+        },
+        {
           label: 'Learn more about ' + config.APP_NAME,
           click: () => {
             const shell = require('./shell')
@@ -342,6 +346,10 @@ function getMenuTemplate () {
       submenu: [
         {
           role: 'about'
+        },
+        {
+          label: 'Check for Updates…',
+          click: () => windows.main.dispatch('checkForUpdates')
         },
         {
           type: 'separator'
