@@ -42,6 +42,7 @@ async function main () {
         if (action === 'snapshot') return player.bridge?.snapshot()
         if (action === 'session') return player.session?.id
         if (action === 'missing-runtime') { player.runtime = () => null; return }
+        if (action === 'restore-runtime') { player.runtime = fromProject(root + '/build/main/vlc-runtime').findRuntime; return }
         if (action === 'command') return player.command(...arg)
         if (action === 'dispatch') return fromProject(root + '/build/main/windows').main.dispatch(...arg)
         if (action === 'sources') return electron.desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 800, height: 500 } }).then(sources => sources.map(source => ({ name: source.name, png: source.thumbnail.toPNG().toString('base64') })))
@@ -57,6 +58,19 @@ async function main () {
       }
       throw new Error('Native playback timed out: ' + JSON.stringify(await inMain('snapshot')))
     }
+    await inMain('missing-runtime')
+    await dispatch('preferences')
+    await page.waitForFunction(() => document.querySelector('#video-engine option[value="vlc"]')?.disabled === true)
+    await inMain('restore-runtime')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.waitForFunction(() => document.querySelector('#video-engine option[value="vlc"]')?.disabled === false)
+    await inMain('missing-runtime')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.waitForFunction(() => document.querySelector('#video-engine option[value="vlc"]')?.disabled === true)
+    await inMain('restore-runtime')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.waitForFunction(() => document.querySelector('#video-engine option[value="vlc"]')?.disabled === false)
+    await dispatch('backToList')
     assert((await page.evaluate(() => window.webtorrent.invoke('native:player-available'))).available)
     await dispatch('showCreateTorrent', [video])
     await page.getByRole('button', { name: 'Show advanced settings...' }).click()

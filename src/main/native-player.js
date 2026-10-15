@@ -23,7 +23,7 @@ class NativePlayer {
       this.bridge ||= this.load()
       return { available: true }
     } catch (_) {
-      return { available: false, message: 'Native VLC was not built for this Mac. Install VLC and rebuild WebTorrent.' }
+      return { available: false, message: 'This WebTorrent installation cannot load native VLC support. Reinstall WebTorrent for this Mac.' }
     }
   }
 

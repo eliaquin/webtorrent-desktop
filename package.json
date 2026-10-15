@@ -1,7 +1,7 @@
 {
   "name": "webtorrent-desktop",
   "description": "WebTorrent, the streaming torrent client. For Mac, Windows, and Linux.",
-  "version": "0.27.1",
+  "version": "0.27.2",
   "author": {
     "name": "WebTorrent, LLC",
     "email": "feross@webtorrent.io",
@@ -91,7 +91,7 @@
     "reset-app": "node bin/reset.js",
     "test-store": "node test/store.js",
     "test-torrent": "node test/torrent.js",
-    "test-native-player": "node test/native-player.js",
+    "test-native-player": "node test/native-player.js && node test/native-build.js",
     "test-native-integration": "npm run build && node test/native-player-integration.js",
     "test-all": "npm test && npm run test-maintenance && npm run test-dependency-helpers && npm run test-cleanup && npm run test-store && npm run test-torrent && npm run test-native-player && npm run test-security && npm run test-ui && npm run test-subtitles && npm run test-audio && npm run test-integration && npm run audit",
     "release": "node bin/release.js",

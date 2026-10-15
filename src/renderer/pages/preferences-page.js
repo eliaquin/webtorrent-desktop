@@ -30,6 +30,7 @@ class PreferencesPage extends React.Component {
       this.handleSetGlobalTrackers.bind(this)
 
     const globalTrackers = this.props.state.getGlobalTrackers().join('\n')
+    this.refreshNativePlayer = this.refreshNativePlayer.bind(this)
 
     this.state = {
       globalTrackers,
@@ -39,12 +40,20 @@ class PreferencesPage extends React.Component {
 
   componentDidMount () {
     this.mounted = true
+    this.refreshNativePlayer()
+    window.addEventListener('focus', this.refreshNativePlayer)
+  }
+
+  refreshNativePlayer () {
     native.playerAvailable().then(nativePlayer => { if (this.mounted) this.setState({ nativePlayer }) }).catch(() => {
       if (this.mounted) this.setState({ nativePlayer: { available: false, message: 'Native VLC is unavailable.' } })
     })
   }
 
-  componentWillUnmount () { this.mounted = false }
+  componentWillUnmount () {
+    this.mounted = false
+    window.removeEventListener('focus', this.refreshNativePlayer)
+  }
 
   videoEngineSelector () {
     if (process.platform !== 'darwin') return

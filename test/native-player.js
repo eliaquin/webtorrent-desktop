@@ -57,9 +57,22 @@ async function main () {
     await player.close(newest.sessionId)
     assert.strictEqual(player.session, null)
     assert.strictEqual(calls.at(-1)[1], '#282828', 'closing restores the opaque window background')
-    const missing = new NativePlayer({ window: () => win, send: () => {}, runtime: () => null })
+    let installed = false
+    let loads = 0
+    const missing = new NativePlayer({ window: () => win, send: () => {}, runtime: () => installed ? '/vlc' : null, load: () => { loads++; return bridge } })
     assert.strictEqual(missing.availability().available, false)
-    console.log('Native player unit checks passed: source authorization, values, stale sessions, cancelled opens, serialized teardown and missing runtime')
+    assert.strictEqual(loads, 0)
+    installed = true
+    assert.strictEqual(missing.availability().available, true, 'installing VLC after startup enables native playback')
+    assert.strictEqual(loads, 1)
+    installed = false
+    assert.strictEqual(missing.availability().available, false, 'removing VLC is detected even with a cached bridge')
+    installed = true
+    assert.strictEqual(missing.availability().available, true)
+    const broken = new NativePlayer({ window: () => win, send: () => {}, runtime: () => '/vlc', load: () => { throw new Error('missing bridge') } })
+    assert.strictEqual(broken.availability().available, false)
+    assert.match(broken.availability().message, /Reinstall WebTorrent/)
+    console.log('Native player unit checks passed: source authorization, values, stale sessions, cancelled opens, serialized teardown and runtime installation/removal')
   } finally { delayClose = false; await player.close() }
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

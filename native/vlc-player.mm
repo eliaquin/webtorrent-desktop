@@ -2,7 +2,10 @@
 // libVLC and its plugins stay in the user's VLC.app; resolve its public ABI at runtime.
 #import <Cocoa/Cocoa.h>
 #include <node_api.h>
-#include <vlc/vlc.h>
+#include <vlc/libvlc.h>
+#include <vlc/libvlc_renderer_discoverer.h>
+#include <vlc/libvlc_media.h>
+#include <vlc/libvlc_media_player.h>
 #include <dlfcn.h>
 #include <cmath>
 #include <string>
