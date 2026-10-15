@@ -39,10 +39,19 @@ async function signAndNotarize (appPath, {
   await sign(options.sign)
   console.log('Mac: Notarizing and stapling the app...')
   await notarize(options.notarize)
+  verifyNotarizedApp(appPath, run)
+}
+
+async function signOnly (appPath, env = process.env) {
+  await require('@electron/osx-sign').sign(signingOptions(appPath, env).sign)
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'inherit' })
+}
+
+function verifyNotarizedApp (appPath, run = execFileSync) {
   run('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'inherit' })
   run('xcrun', ['stapler', 'validate', appPath], { stdio: 'inherit' })
   run('spctl', ['--assess', '--type', 'execute', '--verbose', appPath], { stdio: 'inherit' })
   console.log('Mac: Signed app passed notarization, stapling and Gatekeeper verification.')
 }
 
-module.exports = { signingOptions, signAndNotarize }
+module.exports = { signingOptions, signAndNotarize, signOnly, verifyNotarizedApp }

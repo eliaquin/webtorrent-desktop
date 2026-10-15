@@ -23,7 +23,7 @@ const NODE_MODULES_PATH = path.join(config.ROOT_PATH, 'node_modules')
 
 const argv = minimist(process.argv.slice(2), {
   boolean: [
-    'sign'
+    'sign', 'defer-notarization'
   ],
   default: {
     package: 'all',
@@ -35,6 +35,9 @@ const argv = minimist(process.argv.slice(2), {
 })
 
 function build () {
+  if (argv['defer-notarization'] && (!argv.sign || argv._[0] !== 'darwin')) {
+    throw new Error('--defer-notarization requires darwin --sign')
+  }
   console.log('Installing node_modules...')
   removeDirectory(NODE_MODULES_PATH)
   cp.execSync('npm ci', { stdio: 'inherit' })
@@ -253,6 +256,7 @@ function buildDarwin (cb) {
       if (argv.sign) {
         signApp(function (err) {
           if (err) return cb(err)
+          if (argv['defer-notarization']) return cb(null)
           pack(cb)
         })
       } else {
@@ -264,43 +268,17 @@ function buildDarwin (cb) {
     }
 
     function signApp (cb) {
-      require('./macos-signing').signAndNotarize(appPath).then(() => cb(null), cb)
+      const signing = require('./macos-signing')
+      const operation = argv['defer-notarization'] ? signing.signOnly : signing.signAndNotarize
+      operation(appPath).then(() => cb(null), cb)
     }
 
     function pack (cb) {
-      packageZip() // Include a ZIP for manual downloads and release distribution.
-
-      if (argv.package === 'dmg' || argv.package === 'all') {
-        packageDmg(cb)
-      } else cb(null)
-    }
-
-    function packageZip () {
-      // Create an archive for this architecture.
-      console.log('Mac: Creating zip...')
-
-      const inPath = path.join(buildPath[0], config.APP_NAME + '.app')
-      const outPath = path.join(DIST_PATH, BUILD_NAME + '-darwin-' + (argv.arch || process.arch) + '.zip')
-      zip.zipSync(inPath, outPath)
-
-      console.log('Mac: Created zip.')
-    }
-
-    function packageDmg (cb) {
-      console.log('Mac: Creating dmg...')
-
-      const targetPath = path.join(DIST_PATH, BUILD_NAME + '-darwin-' + (argv.arch || process.arch) + '.dmg')
-      const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-dmg-'))
       try {
-        cp.execFileSync('ditto', [appPath, path.join(staging, config.APP_NAME + '.app')])
-        fs.symlinkSync('/Applications', path.join(staging, 'Applications'))
-        cp.execFileSync('hdiutil', ['create', '-volname', config.APP_NAME, '-srcfolder', staging, '-ov', '-format', 'UDZO', targetPath], { stdio: 'inherit' })
+        const outputBase = path.join(DIST_PATH, BUILD_NAME + '-darwin-' + (argv.arch || process.arch))
+        require('./macos-package').packageMac(appPath, outputBase, ['dmg', 'all'].includes(argv.package))
         cb(null)
-      } catch (err) {
-        cb(err)
-      } finally {
-        fs.rmSync(staging, { recursive: true, force: true })
-      }
+      } catch (err) { cb(err) }
     }
   }).catch(function (err) {
     cb(err)

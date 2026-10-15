@@ -220,6 +220,21 @@ notarized, stapled, and verified with Gatekeeper before packaging. Downloads are
 available in the workflow's artifacts for 30 days; publishing a GitHub release
 is a separate action.
 
+Apple's processing can outlast a CI job. The workflow saves the signed app and
+submission ID first as `macos-ARCH-notarization-pending`, then waits up to five
+minutes. A successful workflow with a **Pending Apple approval** summary means
+the submission was saved, not that the installers are ready. Pending artifacts
+are recovery files and must not be distributed as approved installers.
+
+To check again, run **Signed macOS builds** on `main` and enter the original
+workflow run ID in **resume_run_id** (the number in the run's URL). This restores
+the exact signed app and checks the same Apple submission without rebuilding or
+resubmitting it. Once accepted, the workflow staples and verifies it, then uploads
+`macos-arm64-signed` and `macos-x64-signed` with DMG/ZIP downloads. Resume within
+the 30-day artifact retention period. Apple rejections fail the job and include
+diagnostics; delays leave the submission pending for another resume. Runs from
+before this recovery mechanism cannot be resumed because they saved no app.
+
 Configure these repository Actions secrets (never commit their contents):
 
 | Secret | Value |

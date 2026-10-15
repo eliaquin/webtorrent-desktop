@@ -1,7 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
-const version = require('../package.json').version
+// Resumed Mac builds may come from an older source version than this checkout.
+const version = process.argv[2] || require('../package.json').version
 
 async function main () {
   const prefix = 'WebTorrent-v' + version + '-'

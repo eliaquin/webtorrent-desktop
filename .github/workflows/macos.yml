@@ -1,9 +1,15 @@
 name: Signed macOS builds
 on:
   workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: 'Optional original run ID: finish its saved submissions without rebuilding'
+        type: string
+        default: ''
   workflow_call:
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -11,7 +17,9 @@ jobs:
     if: github.repository == 'eliaquin/webtorrent-desktop' && github.ref == 'refs/heads/main'
     name: Signed macOS / ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 45
+    env:
+      RESUME_RUN_ID: ${{ inputs.resume_run_id || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +37,12 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm test && node test/macos-signing.js && npm run test-native-player
+      - run: npm test && node test/macos-signing.js && node test/macos-notarization.js && npm run test-native-player
+      - name: Restore a saved notarization submission
+        if: env.RESUME_RUN_ID != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node bin/macos-resume.js "${{ matrix.arch }}"
       - name: Import signing and notarization credentials
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -38,15 +51,35 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: bash bin/ci-macos-keychain.sh prepare
-      - name: Build, sign, notarize and verify
+      - name: Build and sign
+        if: env.RESUME_RUN_ID == ''
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: npm run package -- darwin --arch "${{ matrix.arch }}" --package dmg --sign
+        run: npm run package -- darwin --arch "${{ matrix.arch }}" --sign --defer-notarization
+      - name: Submit to Apple without waiting
+        if: env.RESUME_RUN_ID == ''
+        run: node bin/macos-notarization.js submit "${{ matrix.arch }}"
+      - name: Save signed app and submission ID for recovery
+        if: env.RESUME_RUN_ID == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-${{ matrix.arch }}-notarization-pending
+          path: dist/notarization/${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Check Apple approval, staple, verify and package
+        id: notarization
+        run: node bin/macos-notarization.js finish "${{ matrix.arch }}"
       - name: Remove signing credentials
         if: always()
         run: bash bin/ci-macos-keychain.sh cleanup
-      - run: npm run checksums
+      - run: node bin/checksums.js "$BUILD_VERSION"
+        if: steps.notarization.outputs.ready == 'true'
+        env:
+          BUILD_VERSION: ${{ steps.notarization.outputs.version }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.notarization.outputs.ready == 'true'
         with:
           name: macos-${{ matrix.arch }}-signed
           if-no-files-found: error
@@ -55,3 +88,10 @@ jobs:
             dist/*-darwin-${{ matrix.arch }}.dmg
             dist/*-darwin-${{ matrix.arch }}.zip
             dist/*SHA256SUMS.txt
+      - name: Save rejection diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-${{ matrix.arch }}-notarization-diagnostics
+          path: dist/notarization/${{ matrix.arch }}/notarization-log.json
+          if-no-files-found: ignore
