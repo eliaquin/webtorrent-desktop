@@ -1,7 +1,7 @@
 {
   "name": "torrentcat",
   "description": "TorrentCat, the streaming torrent client derived from WebTorrent Desktop.",
-  "version": "0.27.6",
+  "version": "0.27.7",
   "author": {
     "name": "WebTorrent, LLC",
     "email": "feross@webtorrent.io",
