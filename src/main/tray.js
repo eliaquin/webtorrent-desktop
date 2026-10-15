@@ -89,7 +89,7 @@ function getMenuTemplate () {
       }
     } else {
       return {
-        label: 'Show WebTorrent',
+        label: 'Show TorrentCat',
         click: () => windows.main.show()
       }
     }

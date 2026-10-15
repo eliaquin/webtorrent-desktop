@@ -1,19 +1,18 @@
 console.time('init')
 
 const { app, ipcMain } = require('electron')
+const config = require('../config')
+require('./app-identity')(app, config)
 
 // Start crash reporter early, so it takes effect for child processes
 const crashReporter = require('../crash-reporter')
 crashReporter.init()
 
-const config = require('../config')
 const ipc = require('./ipc')
 const log = require('./log')
 const menu = require('./menu')
 const State = require('./state')
 const windows = require('./windows')
-
-const WEBTORRENT_VERSION = require('webtorrent/package.json').version
 
 let shouldQuit = false
 let argv = sliceArgv(process.argv)
@@ -56,13 +55,6 @@ if (shouldQuit) {
 
 function init () {
   app.on('second-instance', (event, commandLine, workingDirectory) => onAppOpen(commandLine))
-  if (config.IS_PORTABLE) {
-    const path = require('path')
-    // Put all user data into the "Portable Settings" folder
-    app.setPath('userData', config.CONFIG_PATH)
-    // Put Electron crash files, etc. into the "Portable Settings\Temp" folder
-    app.setPath('temp', path.join(config.CONFIG_PATH, 'Temp'))
-  }
 
   let isReady = false // app ready, windows can be created
   app.ipcReady = false // main window has finished loading and IPC is ready
@@ -96,11 +88,11 @@ function init () {
     })
   }
 
-  // Enable app logging into default directory, i.e. /Library/Logs/WebTorrent
+  // Enable app logging into the default directory, i.e. ~/Library/Logs/TorrentCat
   // on Mac, %APPDATA% on Windows, $XDG_CONFIG_HOME or ~/.config on Linux.
   app.setAppLogsPath()
 
-  app.userAgentFallback = `WebTorrent/${WEBTORRENT_VERSION} (https://webtorrent.io)`
+  app.userAgentFallback = `${config.APP_NAME}/${config.APP_VERSION} (${config.HOME_PAGE_URL})`
 
   app.on('open-file', onOpen)
   app.on('open-url', onOpen)
@@ -142,6 +134,11 @@ function delayedInit (state) {
 
   dock.init()
   if (!config.IS_TEST) updater.init()
+  // Refresh enabled login items after an app/executable rename without changing
+  // the saved preference or enabling startup for users who opted out.
+  if (!config.IS_TEST && state.saved.prefs.startup) {
+    require('./startup').install().catch(log.error)
+  }
 
   ipc.setModule('folderWatcher', folderWatcher)
   if (folderWatcher.isEnabled()) {

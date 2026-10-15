@@ -7,7 +7,7 @@ const config = require('../src/config')
 
 if (!process.argv.includes('--confirm-profile-reset')) {
   console.error('This removes saved settings, torrent history and cached metadata; downloads are preserved.')
-  console.error('Quit WebTorrent, then run npm run reset-app -- --confirm-profile-reset to proceed.')
+  console.error('Quit TorrentCat, then run npm run reset-app -- --confirm-profile-reset to proceed.')
   process.exitCode = 1
 } else {
   let downloadPath = config.DEFAULT_DOWNLOAD_PATH

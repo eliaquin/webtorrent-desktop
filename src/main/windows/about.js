@@ -17,7 +17,7 @@ function init () {
     backgroundColor: '#ECECEC',
     center: true,
     fullscreen: false,
-    height: 250,
+    height: 310,
     icon: getIconPath(),
     maximizable: false,
     minimizable: false,
@@ -34,7 +34,7 @@ function init () {
       preload: path.join(__dirname, '../../renderer/preload-about.js'),
       backgroundThrottling: false
     },
-    width: 300
+    width: 400
   })
   secureWindow(win)
 

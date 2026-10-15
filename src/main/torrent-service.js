@@ -16,7 +16,7 @@ const queued = []
 
 function init () {
   worker = utilityProcess.fork(path.join(__dirname, '../engine/torrent-service.js'), [], {
-    serviceName: 'WebTorrent networking',
+    serviceName: 'TorrentCat networking',
     env: { ...process.env, WEBTORRENT_CONFIG_PATH: config.CONFIG_PATH, WEBTORRENT_DOWNLOAD_PATH: config.DEFAULT_DOWNLOAD_PATH },
     stdio: 'pipe'
   })

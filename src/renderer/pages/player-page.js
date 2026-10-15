@@ -561,7 +561,7 @@ function renderSubtitleOptions (state) {
       {subtitles.showInstallNotice && (
         <li className='subtitle-install-help'>
           <strong>Enable embedded subtitles</strong>
-          <p>Install the free FFmpeg tool so WebTorrent can find subtitles stored inside video files. You can keep watching without it.</p>
+          <p>Install the free FFmpeg tool so TorrentCat can find subtitles stored inside video files. You can keep watching without it.</p>
           <div className='subtitle-help-actions'>
             <button type='button' onClick={dispatcher('showSubtitleInstallSteps')}>Show installation steps</button>
             <button type='button' onClick={dispatcher('dismissSubtitleInstallNotice')}>Not now</button>
@@ -604,7 +604,7 @@ function renderSubtitleInstallSteps (subtitles) {
               <p>{externalLink('https://ffmpeg.org/download.html', 'Open FFmpeg downloads')}</p>
             </>
           )}
-      <p>Once installed, WebTorrent will check again automatically while these steps are open.</p>
+      <p>Once installed, TorrentCat will check again automatically while these steps are open.</p>
       <div className='subtitle-help-actions'>
         <button type='button' disabled={subtitles.checkingTools} onClick={dispatcher('checkSubtitleTools')}>{subtitles.checkingTools ? 'Checking…' : 'Check again'}</button>
         <button type='button' onClick={dispatcher('dismissSubtitleInstallNotice')}>Not now</button>

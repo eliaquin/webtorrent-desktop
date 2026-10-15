@@ -2,7 +2,9 @@ const os = require('os')
 const path = require('path')
 const { app } = require('electron')
 
-const APP_NAME = 'WebTorrent'
+const APP_NAME = require('../package.json').productName
+// Persisted profiles keep their historical name across product renames.
+const LEGACY_APP_NAME = 'WebTorrent'
 const APP_TEAM = 'WebTorrent, LLC'
 const APP_VERSION = require('../package.json').version
 
@@ -22,6 +24,7 @@ module.exports = {
   APP_FILE_ICON: path.join(__dirname, '..', 'static', 'WebTorrentFile'),
   APP_ICON: path.join(__dirname, '..', 'static', 'WebTorrent'),
   APP_NAME,
+  LEGACY_APP_NAME,
   APP_TEAM,
   APP_VERSION,
   APP_WINDOW_TITLE: APP_NAME,
@@ -71,8 +74,7 @@ module.exports = {
   GITHUB_URL_RAW: 'https://raw.githubusercontent.com/eliaquin/webtorrent-desktop/main',
   GITHUB_URL_RELEASES: 'https://github.com/eliaquin/webtorrent-desktop/releases',
 
-  HOME_PAGE_URL: 'https://webtorrent.io',
-  TWITTER_PAGE_URL: 'https://twitter.com/WebTorrentApp',
+  HOME_PAGE_URL: 'https://github.com/eliaquin/webtorrent-desktop',
 
   IS_PORTABLE,
   IS_PRODUCTION,
@@ -104,9 +106,9 @@ function getConfigPath () {
   if (IS_PORTABLE) {
     return PORTABLE_PATH
   } else {
-    if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', APP_NAME)
-    if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'Local Settings', 'Application Data'), APP_NAME)
-    return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), APP_NAME)
+    if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', LEGACY_APP_NAME)
+    if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'Local Settings', 'Application Data'), LEGACY_APP_NAME)
+    return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), LEGACY_APP_NAME)
   }
 }
 

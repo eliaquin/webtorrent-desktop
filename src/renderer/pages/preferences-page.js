@@ -67,7 +67,7 @@ class PreferencesPage extends React.Component {
             <option value='vlc' disabled={!availability?.available}>Native VLC (experimental)</option>
           </select>
         </div>
-        <p>{availability?.available ? 'Native VLC plays video inside WebTorrent using your installed VLC app. Applies to the next video you open.' : availability?.message || 'Checking for VLC…'}</p>
+        <p>{availability?.available ? 'Native VLC plays video inside TorrentCat using your installed VLC app. Applies to the next video you open.' : availability?.message || 'Checking for VLC…'}</p>
       </Preference>
     )
   }
@@ -99,7 +99,7 @@ class PreferencesPage extends React.Component {
           className='control'
           role='switch'
           checked={!this.props.state.saved.prefs.openExternalPlayer}
-          label='Play media in WebTorrent'
+          label='Play media in TorrentCat'
           onChange={this.handleOpenExternalPlayerChange}
         />
       </Preference>
@@ -137,7 +137,7 @@ class PreferencesPage extends React.Component {
 
     const description = this.props.state.saved.prefs.openExternalPlayer
       ? `Torrent media files will always play in ${playerName}.`
-      : `Torrent media files will play in ${playerName} if WebTorrent cannot play them.`
+      : `Torrent media files will play in ${playerName} if TorrentCat cannot play them.`
 
     return (
       <Preference>
@@ -221,18 +221,18 @@ class PreferencesPage extends React.Component {
       return (
         <Preference>
           <div className='preference-label'>Default torrent app</div>
-          <p className='preference-status'><i className='icon' aria-hidden='true'>check_circle</i>WebTorrent is your default torrent app.</p>
+          <p className='preference-status'><i className='icon' aria-hidden='true'>check_circle</i>TorrentCat is your default torrent app.</p>
         </Preference>
       )
     }
     return (
       <Preference>
         <div className='preference-label'>Default torrent app</div>
-        <p>Open torrent files and magnet links with WebTorrent by default.</p>
+        <p>Open torrent files and magnet links with TorrentCat by default.</p>
         <Button
           className='control'
           onClick={this.handleSetDefaultApp}
-          label='Make WebTorrent the default'
+          label='Make TorrentCat the default'
         />
       </Preference>
     )
@@ -254,7 +254,7 @@ class PreferencesPage extends React.Component {
           className='control'
           role='switch'
           checked={this.props.state.saved.prefs.startup}
-          label='Open WebTorrent on startup'
+          label='Open TorrentCat on startup'
           onChange={this.handleStartupChange}
         />
       </Preference>
@@ -328,7 +328,7 @@ class PreferencesPage extends React.Component {
     return (
       <section className='preferences-page' aria-labelledby='preferences-title'>
         <div className='preferences-heading'>
-          <div><h1 id='preferences-title'>Preferences</h1><p>Make WebTorrent feel like home.</p></div>
+          <div><h1 id='preferences-title'>Preferences</h1><p>Make TorrentCat feel like home.</p></div>
           <span className='preferences-autosave'><i className='icon' aria-hidden='true'>check_circle</i>Changes save automatically</span>
         </div>
         <div className='preferences-layout'>

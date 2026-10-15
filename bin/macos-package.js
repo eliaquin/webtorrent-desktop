@@ -8,9 +8,9 @@ function packageMac (appPath, outputBase, dmg = true) {
   if (!dmg) return
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-dmg-'))
   try {
-    cp.execFileSync('ditto', [appPath, path.join(staging, 'WebTorrent.app')])
+    cp.execFileSync('ditto', [appPath, path.join(staging, 'TorrentCat.app')])
     fs.symlinkSync('/Applications', path.join(staging, 'Applications'))
-    cp.execFileSync('hdiutil', ['create', '-volname', 'WebTorrent', '-srcfolder', staging, '-ov', '-format', 'UDZO', outputBase + '.dmg'], { stdio: 'inherit' })
+    cp.execFileSync('hdiutil', ['create', '-volname', 'TorrentCat', '-srcfolder', staging, '-ov', '-format', 'UDZO', outputBase + '.dmg'], { stdio: 'inherit' })
   } finally {
     fs.rmSync(staging, { recursive: true, force: true })
   }

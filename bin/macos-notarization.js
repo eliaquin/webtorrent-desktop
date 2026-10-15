@@ -21,7 +21,7 @@ function submit (directory, { appPath, arch, version, sourceSha, ...dependencies
   const manifest = path.join(directory, 'submission.json')
   if (fs.existsSync(manifest)) throw new Error('Submission already exists; resume it instead')
   fs.mkdirSync(directory, { recursive: true })
-  const archive = path.join(directory, 'WebTorrent.zip')
+  const archive = path.join(directory, 'TorrentCat.zip')
   require('./archive').zipSync(appPath, archive)
   // Submit without --wait so the app and its ID can be saved before Apple's queue.
   const result = JSON.parse(notary(['submit', archive], dependencies))
@@ -37,7 +37,7 @@ function validateSubmission (directory, arch, sourceSha) {
   if (!['arm64', 'x64'].includes(arch) || state.arch !== arch ||
       !/^[a-f0-9]{40}$/i.test(sourceSha) || state.sourceSha !== sourceSha ||
       !/^[a-f0-9-]{36}$/i.test(state.id) || !/^[0-9][a-z0-9.+-]*$/i.test(state.version) ||
-      state.sha256 !== digest(path.join(directory, 'WebTorrent.zip'))) {
+      state.sha256 !== digest(path.join(directory, 'TorrentCat.zip'))) {
     throw new Error('Saved notarization artifact does not match its architecture, source or checksum')
   }
   return state
@@ -71,11 +71,11 @@ function finish (directory, {
   }
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-notarized-'))
   try {
-    run('ditto', ['-x', '-k', path.join(directory, 'WebTorrent.zip'), staging])
-    const app = path.join(staging, 'WebTorrent.app')
+    run('ditto', ['-x', '-k', path.join(directory, 'TorrentCat.zip'), staging])
+    const app = path.join(staging, 'TorrentCat.app')
     run('xcrun', ['stapler', 'staple', app], { stdio: 'inherit' })
     verify(app, run)
-    packageApp(app, path.join(outputDirectory, `WebTorrent-v${state.version}-darwin-${arch}`))
+    packageApp(app, path.join(outputDirectory, `TorrentCat-v${state.version}-darwin-${arch}`))
     return { ready: true, id: state.id, version: state.version }
   } finally {
     fs.rmSync(staging, { recursive: true, force: true })
@@ -90,7 +90,7 @@ function main () {
   const sourceSha = process.env.NOTARIZATION_SOURCE_SHA || process.env.GITHUB_SHA
   if (command === 'submit') {
     submit(directory, {
-      appPath: path.join(outputDirectory, `WebTorrent-darwin-${arch}`, 'WebTorrent.app'),
+      appPath: path.join(outputDirectory, `TorrentCat-darwin-${arch}`, 'TorrentCat.app'),
       arch,
       sourceSha,
       version: require('../package.json').version

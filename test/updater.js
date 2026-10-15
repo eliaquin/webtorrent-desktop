@@ -8,6 +8,21 @@ const asset = name => ({ name, state: 'uploaded', size: 123, browser_download_ur
 const release = { tag_name: 'v0.27.3', assets: [asset('WebTorrent-v0.27.3-darwin-arm64.dmg'), asset('WebTorrent-v0.27.3-darwin-x64.dmg')] }
 const update = { status: 'available', ...availableUpdate(release, '0.27.2', 'darwin', 'arm64') }
 async function main () {
+  for (const [platform, arch, suffix] of [
+    ['darwin', 'arm64', '-v0.27.3-darwin-arm64.dmg'],
+    ['darwin', 'x64', '-v0.27.3-darwin-x64.zip'],
+    ['win32', 'x64', 'Setup-v0.27.3.exe'],
+    ['linux', 'x64', '-v0.27.3-linux-x64.zip']
+  ]) {
+    const renamed = asset('TorrentCat' + suffix)
+    const legacy = asset('WebTorrent' + suffix)
+    for (const assets of [[renamed], [legacy, renamed]]) {
+      assert.strictEqual(availableUpdate({ ...release, assets }, '0.27.2', platform, arch).downloadURL, renamed.browser_download_url)
+    }
+    assert(availableUpdate({ ...release, assets: [legacy] }, '0.27.2', platform, arch))
+    assert.strictEqual(availableUpdate({ ...release, assets: [{ ...renamed, browser_download_url: 'https://evil.example/app' }] }, '0.27.2', platform, arch), null)
+  }
+  assert.strictEqual(availableUpdate({ ...release, assets: [asset('TorrentCat-v0.27.3-linux-x64.deb')] }, '0.27.2', 'linux', 'x64').directDownload, false)
   assert(update.downloadURL.endsWith('-arm64.dmg'))
   assert(availableUpdate(release, '0.27.2', 'darwin', 'x64').downloadURL.endsWith('-x64.dmg'))
   for (const version of ['0.27.3', '0.28.0']) assert.strictEqual(availableUpdate(release, version, 'darwin', 'arm64'), null)

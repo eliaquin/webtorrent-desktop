@@ -1,6 +1,5 @@
 <h1 align="center">
-  <img src="https://webtorrent.io/img/WebTorrent.png" alt="WebTorrent" width="160"><br>
-  WebTorrent Desktop · Eliaquin’s fork
+  TorrentCat
 </h1>
 
 <p align="center">Stream torrents while they download, with a refreshed library and expanded playback options.</p>
@@ -11,19 +10,27 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
-An independently maintained fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
+TorrentCat is an independently maintained fork of [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop),
 built on the work of WebTorrent, LLC and the [original contributors](AUTHORS.md).
-This fork focuses on the Mac experience, media playback and a modernized codebase.
+TorrentCat focuses on the Mac experience, media playback and a modernized codebase.
+It is not an official WebTorrent release and is not affiliated with or endorsed by
+the upstream project.
 
 ## Download for Mac
 
 | Your Mac | Latest signed and notarized installer |
 | --- | --- |
-| Apple Silicon (M-series) | **[Download for Apple Silicon](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-arm64.dmg)** |
-| Intel | **[Download for Intel](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/WebTorrent-mac-x64.dmg)** |
+| Apple Silicon (M-series) | **[Download for Apple Silicon](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/TorrentCat-mac-arm64.dmg)** |
+| Intel | **[Download for Intel](https://github.com/eliaquin/webtorrent-desktop/releases/latest/download/TorrentCat-mac-x64.dmg)** |
 
-Open the DMG and drag **WebTorrent** into **Applications**. To update, quit the
+Open the DMG and drag **TorrentCat** into **Applications**. To update, quit the
 app and replace it; your downloads and preferences stay in place.
+
+When upgrading from this fork’s WebTorrent app, quit WebTorrent before opening
+TorrentCat. TorrentCat reuses the existing profile, torrent library and download
+locations. Once it is installed, you can remove the old WebTorrent application
+bundle; keep its application-support folder. Windows portable users should keep
+their existing `Portable Settings` folder beside the new executable.
 
 [Release notes, ZIP downloads and checksums](https://github.com/eliaquin/webtorrent-desktop/releases/latest).
 These links always point to the latest published release; no GitHub account is needed.
@@ -33,13 +40,13 @@ Homebrew’s `webtorrent` cask installs the upstream project.
 Windows or Linux binaries. Their platform code and local build tools remain
 available for anyone who wants to [compile from source](docs/DEVELOPMENT.md#package-locally).
 
-## What this fork adds
+## What TorrentCat adds
 
 - **Refreshed library and preferences:** responsive poster shelves, search and
   status filters, per-file selection, visible stream/pause actions, and reorganized
   settings and navigation.
 - **More playback options:** optional native VLC inside the app, plus the built-in
-  player and external-player support. VLC can be installed after WebTorrent and
+  player and external-player support. VLC can be installed after the app and
   detected without rebuilding or restarting.
 - **Better subtitles and audio:** embedded text subtitles, visible track selection,
   subtitle language labels, optional FFmpeg setup, and cached AAC playback copies
@@ -48,7 +55,7 @@ available for anyone who wants to [compile from source](docs/DEVELOPMENT.md#pack
   resume, and recovery when a saved download location is missing.
 - **Update notifications:** checks at startup and every six hours, with **Download**,
   **Not now** and **Skip this version**. Prompts wait until you leave the player or
-  close another dialog. **WebTorrent → Check for Updates…** checks on demand.
+  close another dialog. **TorrentCat → Check for Updates…** checks on demand.
   Downloads open in your browser for manual installation.
 - **Modernized internals:** React 19, Electron 44, WebTorrent 3, isolated sandboxed
   UI windows, a separate torrent/media process, updated dependencies and expanded
@@ -94,7 +101,7 @@ See [development and local packaging](docs/DEVELOPMENT.md),
 [Mac release automation](docs/RELEASING.md),
 [security architecture](SECURITY-AUDIT.md) and
 [dependency maintenance](DEPENDENCY-MAINTENANCE.md).
-Please report issues with this fork in [this repository](https://github.com/eliaquin/webtorrent-desktop/issues).
+Please report TorrentCat issues in [this repository](https://github.com/eliaquin/webtorrent-desktop/issues).
 
 ## Privacy
 
@@ -105,10 +112,10 @@ to localhost.
 
 ## Credits and license
 
-Based on [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop)
+TorrentCat is derived from [WebTorrent Desktop](https://github.com/webtorrent/webtorrent-desktop)
 by **WebTorrent, LLC**, Feross Aboukhadijeh and the many contributors listed in
 [AUTHORS.md](AUTHORS.md). Their authorship, copyright notices and contribution
-history are preserved. This fork is maintained by [Eliaquin](https://github.com/eliaquin)
+history are preserved. TorrentCat is maintained by [Eliaquin](https://github.com/eliaquin)
 and is independent of the upstream project.
 
 [MIT License](LICENSE). Copyright (c) WebTorrent, LLC.

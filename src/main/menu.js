@@ -329,10 +329,10 @@ function getMenuTemplate () {
           }
         },
         {
-          label: 'Follow us on Twitter',
+          label: 'Original WebTorrent Project',
           click: () => {
             const shell = require('./shell')
-            shell.openExternal(config.TWITTER_PAGE_URL)
+            shell.openExternal('https://webtorrent.io')
           }
         }
       ]
@@ -340,12 +340,13 @@ function getMenuTemplate () {
   ]
 
   if (process.platform === 'darwin') {
-    // WebTorrent menu (Mac)
+    // Application menu (Mac)
     template.unshift({
       label: config.APP_NAME,
       submenu: [
         {
-          role: 'about'
+          label: 'About ' + config.APP_NAME,
+          click: () => windows.about.init()
         },
         {
           label: 'Check for Updates…',

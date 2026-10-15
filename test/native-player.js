@@ -71,7 +71,7 @@ async function main () {
     assert.strictEqual(missing.availability().available, true)
     const broken = new NativePlayer({ window: () => win, send: () => {}, runtime: () => '/vlc', load: () => { throw new Error('missing bridge') } })
     assert.strictEqual(broken.availability().available, false)
-    assert.match(broken.availability().message, /Reinstall WebTorrent/)
+    assert.match(broken.availability().message, /Reinstall TorrentCat/)
     console.log('Native player unit checks passed: source authorization, values, stale sessions, cancelled opens, serialized teardown and runtime installation/removal')
   } finally { delayClose = false; await player.close() }
 }

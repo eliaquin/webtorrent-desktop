@@ -98,6 +98,13 @@ const all = {
   // package(s).
   ignore: /^\/src|^\/native|^\/dist|^\/eslint.config.mjs$|\/(appveyor.yml|\.appveyor.yml|\.github|appdmg|AUTHORS|CONTRIBUTORS|bench|benchmark|benchmark\.js|bin|bower\.json|component\.json|coverage|doc|docs|docs\.mli|dragdrop\.min\.js|example|examples|example\.html|example\.js|externs|ipaddr\.min\.js|Makefile|min|minimist|perf|rusha|simplepeer\.min\.js|simplewebsocket\.min\.js|static\/screenshot\.png|test|tests|test\.js|tests\.js|webtorrent\.min\.js|\.[^/]*|.*\.md|.*\.markdown)$/,
 
+  // Preserve upstream credits even though general Markdown files are excluded.
+  afterCopy: [async ({ buildPath }) => {
+    for (const name of ['LICENSE', 'AUTHORS.md']) {
+      fs.copyFileSync(path.join(config.ROOT_PATH, name), path.join(buildPath, name))
+    }
+  }],
+
   // The application name.
   name: config.APP_NAME,
 
@@ -122,7 +129,7 @@ const darwin = {
   // Build for the current Mac architecture, or the explicit --arch override.
   arch: argv.arch || process.arch,
 
-  // The bundle identifier to use in the application's plist (Mac only).
+  // Retain the bundle identity for existing file associations and OS preferences.
   appBundleId: 'io.webtorrent.webtorrent',
 
   // The application category type, as shown in the Finder via "View" -> "Arrange by
@@ -180,7 +187,9 @@ const linux = {
   // Note: Application icon for Linux is specified via the BrowserWindow `icon` option.
 }
 
-build()
+if (require.main === module) build()
+
+module.exports = { all, darwin, win32, linux }
 
 function buildDarwin (cb) {
   const plist = require('plist')
@@ -338,7 +347,7 @@ function buildWin32 (cb) {
         authors: config.APP_TEAM,
         description: config.APP_NAME,
         exe: config.APP_NAME + '.exe',
-        iconUrl: config.GITHUB_URL_RAW + '/static/' + config.APP_NAME + '.ico',
+        iconUrl: config.GITHUB_URL_RAW + '/static/' + path.basename(config.APP_ICON) + '.ico',
         loadingGif: path.join(config.STATIC_PATH, 'loading.gif'),
         name: config.APP_NAME,
         noMsi: true,
@@ -443,10 +452,10 @@ function buildLinux (cb) {
       src: filesPath + '/',
       dest: DIST_PATH,
       arch: destArch,
-      bin: 'WebTorrent',
+      bin: config.APP_NAME,
       icon: {
-        '48x48': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/48x48/apps/webtorrent-desktop.png'),
-        '256x256': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/256x256/apps/webtorrent-desktop.png')
+        '48x48': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/48x48/apps/torrentcat.png'),
+        '256x256': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/256x256/apps/torrentcat.png')
       },
       categories: ['Network', 'FileTransfer', 'P2P'],
       mimeType: ['application/x-bittorrent', 'x-scheme-handler/magnet', 'x-scheme-handler/stream-magnet'],
@@ -487,10 +496,10 @@ function buildLinux (cb) {
       src: filesPath + '/',
       dest: DIST_PATH,
       arch: destArch,
-      bin: 'WebTorrent',
+      bin: config.APP_NAME,
       icon: {
-        '48x48': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/48x48/apps/webtorrent-desktop.png'),
-        '256x256': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/256x256/apps/webtorrent-desktop.png')
+        '48x48': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/48x48/apps/torrentcat.png'),
+        '256x256': path.join(config.STATIC_PATH, 'linux/share/icons/hicolor/256x256/apps/torrentcat.png')
       },
       categories: ['Network', 'FileTransfer', 'P2P'],
       mimeType: ['application/x-bittorrent', 'x-scheme-handler/magnet', 'x-scheme-handler/stream-magnet'],

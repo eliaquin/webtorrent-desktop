@@ -93,6 +93,24 @@ Search and filters are local to the library view and reset when leaving it.
 Usage diagnostics remain local and bounded in memory; crash uploads are disabled.
 Update checks use this fork's GitHub releases and require manual installation.
 
+## Application identity and existing profiles
+
+The product and executable are named **TorrentCat**. The npm/Linux package name
+is `torrentcat`; the GitHub repository remains `eliaquin/webtorrent-desktop`.
+
+Application profiles retain the historical `WebTorrent` directory on macOS,
+Windows and Linux. Electron’s user/session data also keeps its historical path,
+set before crash reporting and the single-instance lock. Windows application
+settings remain in LocalAppData while Electron data remains in Roaming AppData.
+Portable builds continue to use `Portable Settings`, including its Downloads
+folder. No profile files or downloaded media are moved or renamed. Existing
+`WEBTORRENT_*` environment overrides remain supported.
+
+The macOS bundle identifiers and Windows file-association identifier remain
+stable for upgrade compatibility. Enabled login items are refreshed on launch
+for the new executable. Original license and contributor notices remain in the
+package and About window. Icon artwork is unchanged.
+
 ## Cleanup
 
 `npm run clean` removes only generated build files. Downloads, saved settings and
@@ -113,6 +131,10 @@ npm run package -- darwin --arch x64
 npm run package -- win32 --arch x64
 npm run package -- linux --arch x64
 ```
+
+After `npm run build`, `node test/package-identity.js` checks a temporary Mac
+package, its ZIP/DMG contents and credits, and runs the integration suite against
+the packaged executable. It removes the temporary artifacts afterwards.
 
 macOS packaging requires a Mac. Unsigned local Mac builds need no Apple
 credentials. See [Mac releases](RELEASING.md) for signing and notarization.

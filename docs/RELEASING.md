@@ -1,4 +1,4 @@
-# Mac releases
+# TorrentCat Mac releases
 
 [Back to README](../README.md)
 
@@ -14,6 +14,12 @@ release**. After the full CI suite passes, it increments the patch version in
 publishes the GitHub release only after notarization, Gatekeeper verification and
 checksum validation. Documentation-only changes do not create a release.
 
+For a build-only delivery, include `[skip release]` in the pushed commit message.
+Normal CI still runs; automatic versioning and publication are skipped. Dispatch
+**Signed macOS builds** manually to produce signed workflow artifacts without a
+public release. Increment the version locally before pushing if the build needs
+a new version number.
+
 If Apple is still processing, the release stays a draft. A scheduled workflow
 checks pending releases every 30 minutes (subject to GitHub scheduling delays)
 and resumes their saved submissions automatically. Public releases include stable
@@ -25,6 +31,20 @@ To start a patch release manually, run **Prepare patch release** on `main` or
 `npm run release`. Minor or major version changes remain an explicit maintainer
 decision. Failed builds remain private drafts; fix and rerun the original failed
 job before resuming a draft that lacks recovery artifacts.
+
+## Installer names and upgrade compatibility
+
+New builds use `TorrentCat.app`, the `TorrentCat` executable and DMG volume,
+`TorrentCat-vVERSION-darwin-ARCH.dmg` / `.zip`, and
+`TorrentCat-vVERSION-SHA256SUMS.txt`. Published releases also provide
+`TorrentCat-mac-ARCH.dmg` for the README’s stable links.
+
+The release publisher retains identical `WebTorrent-vVERSION-darwin-ARCH`
+DMG/ZIP aliases so existing installations can discover the update, and
+`WebTorrent-mac-ARCH.dmg` aliases for existing download links. All aliases are
+covered by the published checksums. TorrentCat’s update checker accepts both
+names, preferring TorrentCat. Recovery and publication of pending releases
+continue to use their original source revision and verified artifacts.
 
 ## Manual Mac builds
 

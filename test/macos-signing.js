@@ -6,7 +6,7 @@ const { signingOptions, signAndNotarize } = require('../bin/macos-signing')
 
 async function main () {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'webtorrent-signing-test-'))
-  const app = path.join(directory, 'WebTorrent.app')
+  const app = path.join(directory, 'TorrentCat.app')
   const env = { APPLE_SIGNING_IDENTITY: 'Developer ID Application: Example (TESTTEAM)', APPLE_NOTARY_PROFILE: 'ci', APPLE_KEYCHAIN: '/tmp/test.keychain-db' }
   try {
     assert.throws(() => signingOptions(app, {}), /Developer ID/)
@@ -20,7 +20,8 @@ async function main () {
     assert.strictEqual(options.notarize.keychain, env.APPLE_KEYCHAIN)
     assert(options.sign.optionsForFile(app).hardenedRuntime)
     assert(options.sign.optionsForFile(app).entitlements.endsWith('darwin-native-player-entitlements.plist'))
-    assert(options.sign.optionsForFile(path.join(app, 'Contents/Frameworks/WebTorrent Helper.app')).entitlements.endsWith('/darwin-entitlements.plist'))
+    assert(options.sign.optionsForFile(path.join(app, 'Contents/Frameworks/TorrentCat Helper.app')).entitlements.endsWith('/darwin-entitlements.plist'))
+    assert(options.sign.optionsForFile(path.join(app, 'Contents/MacOS/TorrentCat')).entitlements.endsWith('darwin-native-player-entitlements.plist'))
     const steps = []
     const dependencies = {
       env,

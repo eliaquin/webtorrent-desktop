@@ -19,7 +19,7 @@ function signingOptions (appPath, env = process.env) {
     optionsForFile: filePath => ({
       hardenedRuntime: true,
       entitlements: path.join(__dirname, hasNativePlayer &&
-        [appPath, path.join(appPath, 'Contents/MacOS/WebTorrent')].includes(filePath)
+        [appPath, path.join(appPath, 'Contents/MacOS/TorrentCat')].includes(filePath)
         ? 'darwin-native-player-entitlements.plist'
         : 'darwin-entitlements.plist')
     })

@@ -14,7 +14,8 @@ async function setEnabled (enabled) {
   if (process.platform === 'darwin' || process.platform === 'win32') {
     const options = { openAtLogin: enabled, args: ['--hidden'] }
     if (process.platform === 'win32') {
-      options.name = config.APP_NAME
+      // Keep the existing Run entry so a rename does not create duplicate login items.
+      options.name = config.LEGACY_APP_NAME
       const updater = path.resolve(path.dirname(process.execPath), '..', 'Update.exe')
       if (config.IS_PRODUCTION && existsSync(updater)) {
         options.path = updater
@@ -28,10 +29,13 @@ async function setEnabled (enabled) {
   const filename = path.join(folder, config.APP_NAME + '.desktop')
   const legacy = path.join(os.homedir(), '.config', 'autostart', config.APP_NAME + '.desktop')
   if (legacy !== filename) await fs.rm(legacy, { force: true })
+  for (const oldFolder of new Set([folder, path.join(os.homedir(), '.config', 'autostart')])) {
+    await fs.rm(path.join(oldFolder, config.LEGACY_APP_NAME + '.desktop'), { force: true })
+  }
   if (!enabled) { await fs.rm(filename, { force: true }); return }
   const args = [app.getPath('exe'), ...(config.IS_PRODUCTION ? [] : [config.ROOT_PATH]), '--hidden']
   await fs.mkdir(folder, { recursive: true, mode: 0o700 })
-  await fs.writeFile(filename, '[Desktop Entry]\nType=Application\nName=WebTorrent\nExec=' + args.map(desktopQuote).join(' ') + '\nTerminal=false\n', { mode: 0o600 })
+  await fs.writeFile(filename, '[Desktop Entry]\nType=Application\nName=' + config.APP_NAME + '\nExec=' + args.map(desktopQuote).join(' ') + '\nTerminal=false\n', { mode: 0o600 })
 }
 
 module.exports = { install: () => setEnabled(true), uninstall: () => setEnabled(false) }

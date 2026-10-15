@@ -5,7 +5,7 @@ const { createHash } = require('crypto')
 const version = process.argv[2] || require('../package.json').version
 
 async function main () {
-  const prefix = 'WebTorrent-v' + version + '-'
+  const prefix = 'TorrentCat-v' + version + '-'
   const files = fs.readdirSync('dist').filter(name => name.startsWith(prefix) && /\.(zip|dmg|exe|deb|rpm|nupkg)$/.test(name)).sort()
   if (!files.length) throw new Error('Build release artifacts before generating checksums')
   const entries = []

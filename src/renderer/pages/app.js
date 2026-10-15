@@ -84,7 +84,7 @@ const Modal = React.memo(function Modal ({ store }) {
   return (
     <div key='modal' className='modal'>
       <div key='modal-background' className='modal-background' />
-      <div key='modal-content' className='modal-content' role='dialog' aria-modal='true' aria-label='WebTorrent dialog'>
+      <div key='modal-content' className='modal-content' role='dialog' aria-modal='true' aria-label='TorrentCat dialog'>
         <Contents state={state} />
       </div>
     </div>

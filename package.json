@@ -1,7 +1,7 @@
 {
-  "name": "webtorrent-desktop",
-  "description": "WebTorrent, the streaming torrent client. For Mac, Windows, and Linux.",
-  "version": "0.27.5",
+  "name": "torrentcat",
+  "description": "TorrentCat, the streaming torrent client derived from WebTorrent Desktop.",
+  "version": "0.27.6",
   "author": {
     "name": "WebTorrent, LLC",
     "email": "feross@webtorrent.io",
@@ -67,7 +67,7 @@
     "electron-installer-redhat": "4.0.0"
   },
   "private": true,
-  "productName": "WebTorrent",
+  "productName": "TorrentCat",
   "repository": {
     "type": "git",
     "url": "https://github.com/eliaquin/webtorrent-desktop.git"
@@ -98,7 +98,7 @@
     "checksums": "node bin/checksums.js",
     "test-cleanup": "node test/cleanup.js",
     "test-dependency-helpers": "node test/dependency-helpers.js",
-    "test-maintenance": "node test/navigation.js && node test/vlc-discovery.js && node test/archive.js && node test/lint.js"
+    "test-maintenance": "node test/app-identity.js && node test/navigation.js && node test/vlc-discovery.js && node test/archive.js && node test/lint.js"
   },
   "renovate": {
     "extends": [

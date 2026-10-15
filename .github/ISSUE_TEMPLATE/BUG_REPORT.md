@@ -9,7 +9,7 @@ assignees: ''
 
 <!-- DO NOT POST LINKS OR REFERENCES TO COPYRIGHTED CONTENT IN YOUR ISSUE. -->
 
-**What version of WebTorrent Desktop are you using?**
+**What version of TorrentCat are you using?**
 
 **What operating system and version?**
 

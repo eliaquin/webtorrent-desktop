@@ -63,8 +63,8 @@ function prepare () {
     if (!release) {
       const data = { version, sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID }
       const notes = path.join(process.env.RUNNER_TEMP, 'release-notes.md')
-      fs.writeFileSync(notes, `Signed and notarized macOS installers for Apple Silicon and Intel. Download the DMG for your Mac and drag WebTorrent into Applications. Your downloads and preferences are preserved.\n\n<!-- webtorrent-release ${JSON.stringify(data)} -->\n`)
-      gh(['release', 'create', `v${version}`, '--repo', REPOSITORY, '--target', data.sha, '--draft', '--title', `WebTorrent v${version}`, '--generate-notes', '--notes-file', notes])
+      fs.writeFileSync(notes, `Signed and notarized macOS installers for Apple Silicon and Intel. Download the DMG for your Mac and drag TorrentCat into Applications. Your downloads and preferences are preserved.\n\n<!-- webtorrent-release ${JSON.stringify(data)} -->\n`)
+      gh(['release', 'create', `v${version}`, '--repo', REPOSITORY, '--target', data.sha, '--draft', '--title', `TorrentCat v${version}`, '--generate-notes', '--notes-file', notes])
       output({ build: true, source_ref: data.sha, version, resume_run_id: '' })
       return
     }
@@ -81,8 +81,10 @@ function prepare () {
 }
 
 function verifyFiles (directory, version, arch) {
-  const prefix = `WebTorrent-v${version}-darwin-${arch}`
-  const sums = fs.readFileSync(path.join(directory, `WebTorrent-v${version}-SHA256SUMS.txt`), 'utf8').trim().split('\n')
+  // Pending releases may have been built before the rename.
+  const brand = fs.existsSync(path.join(directory, `TorrentCat-v${version}-SHA256SUMS.txt`)) ? 'TorrentCat' : 'WebTorrent'
+  const prefix = `${brand}-v${version}-darwin-${arch}`
+  const sums = fs.readFileSync(path.join(directory, `${brand}-v${version}-SHA256SUMS.txt`), 'utf8').trim().split('\n')
   return ['dmg', 'zip'].map(extension => {
     const name = `${prefix}.${extension}`
     const file = path.join(directory, name)
@@ -90,6 +92,24 @@ function verifyFiles (directory, version, arch) {
     if (!sums.includes(`${hash}  ${name}`)) throw new Error('Release artifact checksum mismatch: ' + name)
     return { file, name, hash }
   })
+}
+
+function releaseAliases (directory, files, version, arch) {
+  const aliases = []
+  for (const source of files) {
+    const extension = path.extname(source.name)
+    const names = ['TorrentCat', 'WebTorrent'].flatMap(brand => [
+      `${brand}-v${version}-darwin-${arch}${extension}`,
+      ...(extension === '.dmg' ? [`${brand}-mac-${arch}.dmg`] : [])
+    ])
+    for (const name of names) {
+      if (name === source.name) continue
+      const file = path.join(directory, name)
+      fs.copyFileSync(source.file, file)
+      aliases.push({ file, name, hash: source.hash })
+    }
+  }
+  return aliases
 }
 
 function publish () {
@@ -109,12 +129,8 @@ function publish () {
     for (const arch of ['arm64', 'x64']) {
       const destination = path.join(directory, arch)
       gh(['run', 'download', process.env.GITHUB_RUN_ID, '--repo', REPOSITORY, '--name', `macos-${arch}-signed`, '--dir', destination])
-      files.push(...verifyFiles(destination, version, arch))
-      // Stable asset names keep README "latest" links valid across versions.
-      const name = `WebTorrent-mac-${arch}.dmg`
-      const file = path.join(directory, name)
-      fs.copyFileSync(path.join(destination, `WebTorrent-v${version}-darwin-${arch}.dmg`), file)
-      files.push({ file, name, hash: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') })
+      const verified = verifyFiles(destination, version, arch)
+      files.push(...verified, ...releaseAliases(directory, verified, version, arch))
     }
     const sums = path.join(directory, 'SHA256SUMS.txt')
     fs.writeFileSync(sums, files.map(({ hash, name }) => `${hash}  ${name}`).join('\n') + '\n')
@@ -129,7 +145,7 @@ function publish () {
       return index !== -1 && candidate[index] > current[index]
     })
     gh(['release', 'edit', `v${version}`, '--repo', REPOSITORY, '--draft=false', `--latest=${!newerExists}`])
-    summary(`Published [WebTorrent v${version}](https://github.com/${REPOSITORY}/releases/tag/v${version}). Both architectures are signed, notarized and verified.`)
+    summary(`Published [TorrentCat v${version}](https://github.com/${REPOSITORY}/releases/tag/v${version}). Both architectures are signed, notarized and verified.`)
   } finally { fs.rmSync(directory, { recursive: true, force: true }) }
 }
 
@@ -142,4 +158,4 @@ if (require.main === module) {
     command()
   } catch (error) { console.error(error.message); process.exitCode = 1 }
 }
-module.exports = { metadata, verifyFiles }
+module.exports = { metadata, verifyFiles, releaseAliases }

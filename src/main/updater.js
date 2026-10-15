@@ -8,12 +8,16 @@ function availableUpdate (release, currentVersion, platform, arch) {
   const version = semver.valid(release?.tag_name)
   if (!version || release.draft || release.prerelease || semver.prerelease(version) ||
       !semver.gt(version, currentVersion)) return null
-  const prefix = `WebTorrent-v${version}`
-  const names = platform === 'darwin'
-    ? [`${prefix}-darwin-${arch}.dmg`, `${prefix}-darwin-${arch}.zip`]
-    : platform === 'win32' && arch === 'x64'
-      ? [`WebTorrentSetup-v${version}.exe`, `${prefix}-win.zip`]
-      : platform === 'linux' ? [`${prefix}-linux-${arch}.zip`] : []
+  // Prefer the new brand, but accept releases from before the rename.
+  const brands = ['TorrentCat', 'WebTorrent']
+  const names = brands.flatMap(brand => {
+    const prefix = `${brand}-v${version}`
+    return platform === 'darwin'
+      ? [`${prefix}-darwin-${arch}.dmg`, `${prefix}-darwin-${arch}.zip`]
+      : platform === 'win32' && arch === 'x64'
+        ? [`${brand}Setup-v${version}.exe`, `${prefix}-win.zip`]
+        : platform === 'linux' ? [`${prefix}-linux-${arch}.zip`] : []
+  })
   const assets = Array.isArray(release.assets) ? release.assets : []
   const usable = asset => asset.state === 'uploaded' && asset.size > 0
   const asset = names.map(name => assets.find(asset => asset.name === name && usable(asset))).find(Boolean)
@@ -26,7 +30,7 @@ function availableUpdate (release, currentVersion, platform, arch) {
   }
   // Linux users choose the package format for their distribution.
   if (platform === 'linux' && assets.some(asset => usable(asset) &&
-      [`${prefix}-linux-${arch}.deb`, `${prefix}-linux-${arch}.rpm`].includes(asset.name))) {
+      brands.some(brand => [`${brand}-v${version}-linux-${arch}.deb`, `${brand}-v${version}-linux-${arch}.rpm`].includes(asset.name)))) {
     return { version, downloadURL: releaseURL, releaseURL, directDownload: false }
   }
   return null // Don't announce releases without a download for this computer.

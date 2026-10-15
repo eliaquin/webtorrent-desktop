@@ -11,7 +11,7 @@ const sourceSha = 'a'.repeat(40)
 const id = 'e24247af-cf11-4f27-a995-46b5d4ea3e01'
 const env = { APPLE_NOTARY_PROFILE: 'test', APPLE_KEYCHAIN: '/tmp/test.keychain-db' }
 try {
-  const appPath = path.join(directory, 'WebTorrent.app')
+  const appPath = path.join(directory, 'TorrentCat.app')
   fs.mkdirSync(appPath)
   fs.writeFileSync(path.join(appPath, 'example'), 'signed app fixture')
   const saved = path.join(directory, 'saved')
@@ -80,7 +80,7 @@ try {
   assert.throws(() => finish(saved, { ...options, verify: () => { throw new Error('Gatekeeper rejected') } }), /Gatekeeper rejected/)
   assert.throws(() => finish(saved, { ...options, run: () => { throw new Error('Authentication failed') } }), /Authentication failed/)
 
-  fs.appendFileSync(path.join(saved, 'WebTorrent.zip'), 'tampering')
+  fs.appendFileSync(path.join(saved, 'TorrentCat.zip'), 'tampering')
   assert.throws(() => validateSubmission(saved, arch, sourceSha), /does not match/)
 
   const repository = 'eliaquin/webtorrent-desktop'

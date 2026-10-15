@@ -32,6 +32,16 @@ async function main () {
     page.on('pageerror', error => console.error('Renderer error:', error))
     page.on('console', message => { if (message.type() === 'error') console.error('Renderer console:', message.text()) })
     await page.waitForSelector('.app')
+    const identity = await application.evaluate(({ app, Menu }, profile) => ({
+      name: app.getName(),
+      userData: app.getPath('userData'),
+      sessionData: app.getPath('sessionData'),
+      menu: Menu.getApplicationMenu().items.map(item => item.label)
+    }), directory)
+    assert.strictEqual(identity.name, 'TorrentCat')
+    assert.strictEqual(identity.userData, directory)
+    assert.strictEqual(identity.sessionData, directory)
+    if (process.platform === 'darwin') assert.strictEqual(identity.menu[0], 'TorrentCat')
     async function dispatch (name, ...args) {
       await application.evaluate((electron, args) => {
         const root = electron.app.getAppPath()
@@ -57,6 +67,20 @@ async function main () {
         })
       }, { name, completeMetadata, infoHash })
     }
+
+    const aboutWindow = application.waitForEvent('window')
+    await application.evaluate(({ app }) => {
+      const root = app.getAppPath()
+      process.getBuiltinModule('module').createRequire(root + '/package.json')(root + '/build/main/windows').about.init()
+    })
+    const about = await aboutWindow
+    await about.waitForFunction(() => document.querySelector('#app-version')?.textContent)
+    assert.strictEqual(await about.title(), 'About TorrentCat')
+    assert.strictEqual(await about.locator('h1').textContent(), 'TorrentCat')
+    assert((await about.locator('body').textContent()).includes('Feross Aboukhadijeh'))
+    assert((await about.locator('#app-copyright').textContent()).includes('WebTorrent, LLC'))
+    assert(await about.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight), 'About credits fit without clipping')
+    await about.close()
 
     // Exercise the production folder watcher against actual filesystem events.
     await application.evaluate(async ({ app }, directory) => {
